@@ -1,0 +1,17 @@
+services:
+  # ------------------------------------
+  # 1. Backend Service (Python/FastAPI)
+  # ------------------------------------
+  - type: web
+    name: livesop-backend
+    runtime: python
+    region: oregon 
+    plan: free # Change to 'starter' if you need more power
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: OPENAI_API_KEY
+        sync: false # You will be prompted to enter this in dashboard
+    autoDeploy: false

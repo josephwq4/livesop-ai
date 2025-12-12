@@ -1,0 +1,32 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+backend/venv/
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+
+# Environment Variables (CRITICAL: Do not upload credentials)
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env.local
+
+# Build outputs
+dist/
+build/
+backend/build/
+backend/dist/
+
+# IDE settings
+.vscode/
+.idea/
+
+# Testing/Logs
+*.log
+coverage/
+backend/test.db

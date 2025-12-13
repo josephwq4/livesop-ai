@@ -19,6 +19,10 @@ router = APIRouter(tags=["integrations"])
 def get_slack_events(token: str, channels: str):
     """Fetch events from Slack channels"""
     try:
+        # Fallback to env var if token is empty or placeholder
+        if not token or len(token) < 10 or token == "env":
+            token = os.getenv("SLACK_TOKEN", "")
+
         channel_list = channels.split(",")
         events = fetch_slack_events(token, channel_list)
         return {
@@ -28,6 +32,9 @@ def get_slack_events(token: str, channels: str):
             "events": events
         }
     except Exception as e:
+        import traceback
+        print("❌ [ROUTE ERROR] /integrations/slack failed:")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error fetching Slack events: {str(e)}")
 
 

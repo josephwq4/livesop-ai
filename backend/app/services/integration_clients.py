@@ -15,14 +15,24 @@ def fetch_all_events(team_id: str) -> List[Dict[str, Any]]:
     
     # Fetch from different sources
     # In production, these would use team-specific credentials from database
+    # Fetch from different sources
+    # In production, these would use team-specific credentials from database
     try:
-        slack_events = fetch_slack_events(os.getenv("SLACK_TOKEN", ""), ["general"])
+        # Get channels from env or default to commonly used ones
+        channels_env = os.getenv("SLACK_CHANNELS", "new-channel,general,random")
+        channels = [c.strip() for c in channels_env.split(",")]
+        
+        slack_events = fetch_slack_events(os.getenv("SLACK_TOKEN", ""), channels)
         all_events.extend(slack_events)
     except Exception as e:
         print(f"Error fetching Slack events: {e}")
     
     try:
-        jira_events = fetch_jira_issues(os.getenv("JIRA_API_KEY", ""), os.getenv("JIRA_PROJECT", ""))
+        # Align env var names (API_TOKEN is usually what we set)
+        jira_token = os.getenv("JIRA_API_TOKEN") or os.getenv("JIRA_API_KEY", "")
+        jira_project = os.getenv("JIRA_PROJECT", "PROJ")
+        
+        jira_events = fetch_jira_issues(jira_token, jira_project)
         all_events.extend(jira_events)
     except Exception as e:
         print(f"Error fetching Jira issues: {e}")
@@ -40,8 +50,56 @@ def fetch_all_events(team_id: str) -> List[Dict[str, Any]]:
     return all_events
 
 
+# In-memory user cache with timestamp (Simple implementation)
+_slack_user_cache: Dict[str, str] = {}
+_cache_timestamp: float = 0
+CACHE_TTL = 3600  # 1 hour
+
+def _get_slack_users_map(client: WebClient) -> Dict[str, str]:
+    """Fetch all users and map ID -> Real Name. Uses caching."""
+    global _slack_user_cache, _cache_timestamp
+    import time
+    
+    current_time = time.time()
+    if _slack_user_cache and (current_time - _cache_timestamp < CACHE_TTL):
+        return _slack_user_cache
+
+    try:
+        # Fetch all users (pagination might be needed for huge teams, keeping simple for now)
+        response = client.users_list(limit=200)
+        user_map = {}
+        for user in response["members"]:
+            profile = user.get("profile", {})
+            # Use display name, fallback to real name, fallback to name
+            name = profile.get("display_name") or profile.get("real_name") or user.get("name")
+            user_map[user["id"]] = name
+        
+        _slack_user_cache = user_map
+        _cache_timestamp = current_time
+        print(f"Refreshed Slack User Cache: {len(user_map)} users")
+        return user_map
+    except SlackApiError as e:
+        print(f"Warning: Could not resolve Slack users: {e}")
+        return {}
+
+def _classify_signal(text: str) -> str:
+    """Heuristic classification of message intent"""
+    text_lower = text.lower()
+    
+    # Keywords for heuristic classification
+    if any(w in text_lower for w in ["over to", "taking look", "assigned", "handing off"]):
+        return "handoff"
+    if any(w in text_lower for w in ["approved", "lgtm", "merged", "signed off", "looks good"]):
+        return "approval"
+    if any(w in text_lower for w in ["blocked", "stuck", "hold", "fail", "error", "breaking"]):
+        return "blocker"
+    if any(w in text_lower for w in ["status", "update", "progress", "completed", "done", "fixed"]):
+        return "status_update"
+        
+    return "unknown"
+
 def fetch_slack_events(token: str, channels: List[str]) -> List[Dict[str, Any]]:
-    """Fetch messages from Slack channels"""
+    """Fetch structured workflow signals from Slack channels"""
     if not token:
         # Return mock data for MVP
         return [
@@ -51,14 +109,8 @@ def fetch_slack_events(token: str, channels: List[str]) -> List[Dict[str, Any]]:
                 "timestamp": datetime.now().isoformat(),
                 "actor": "Alice",
                 "source": "slack",
-                "metadata": {"channel": "general"}
-            },
-            {
-                "id": "slack_2",
-                "text": "Bob: Reviewed the PR and approved it",
-                "timestamp": datetime.now().isoformat(),
-                "actor": "Bob",
-                "source": "slack",
+                "signal_type": "status_update",
+                "thread_role": "root",
                 "metadata": {"channel": "general"}
             }
         ]
@@ -66,72 +118,165 @@ def fetch_slack_events(token: str, channels: List[str]) -> List[Dict[str, Any]]:
     try:
         client = WebClient(token=token)
         events = []
+        user_map = _get_slack_users_map(client)
         
-        for channel in channels:
-            response = client.conversations_history(channel=channel, limit=50)
-            for message in response["messages"]:
-                events.append({
-                    "id": f"slack_{message.get('ts')}",
-                    "text": message.get("text", ""),
-                    "timestamp": message.get("ts", ""),
-                    "actor": message.get("user", "unknown"),
+        # Helper to resolve channel ID
+        def _resolve_channel_id(name_or_id):
+            if name_or_id.startswith("C"): return name_or_id
+            try:
+                # Cache this in production!
+                for result in client.conversations_list():
+                    for channel in result["channels"]:
+                        if channel["name"] == name_or_id:
+                            return channel["id"]
+            except Exception:
+                pass
+            return name_or_id
+
+        for channel_name in channels:
+            channel_id = _resolve_channel_id(channel_name)
+            
+            # 1. Fetch History (Roots)
+            try:
+                history = client.conversations_history(channel=channel_id, limit=20)
+            except SlackApiError as e:
+                print(f"Error reading channel {channel_name} ({channel_id}): {e}")
+                continue
+
+            for msg in history["messages"]:
+                if msg.get("type") != "message" or msg.get("subtype"):
+                    continue
+
+                text = msg.get("text", "")
+                user_id = msg.get("user", "")
+                ts = msg.get("ts")
+                
+                # Resolve Actor
+                actor = user_map.get(user_id, f"User_{user_id}")
+                
+                # Filter noise: Short messages that are NOT threads
+                if len(text) < 5 and "thread_ts" not in msg:
+                    continue
+
+                # Process Root Message
+                root_event = {
+                    "id": f"slack_{ts}",
+                    "text": text,
+                    "timestamp": datetime.fromtimestamp(float(ts)).isoformat(),
+                    "actor": actor,
                     "source": "slack",
-                    "metadata": {"channel": channel}
-                })
-        
+                    "signal_type": _classify_signal(text),
+                    "thread_role": "thread_root",
+                    "metadata": {"channel": channel, "thread_ts": ts}
+                }
+                print(f"🔍 [SIGNAL] {root_event['signal_type'].upper()}: {text[:50]}... ({actor})")
+                events.append(root_event)
+                
+                # 2. Fetch Replies (if thread exists)
+                if msg.get("reply_count", 0) > 0:
+                    try:
+                        replies_resp = client.conversations_replies(channel=channel, ts=ts, limit=10)
+                        for reply in replies_resp["messages"]:
+                            if reply["ts"] == ts: continue # Skip root (already added)
+                            
+                            r_text = reply.get("text", "")
+                            r_user = reply.get("user", "")
+                            r_actor = user_map.get(r_user, f"User_{r_user}")
+                            
+                            # Replies are valuable even if short (e.g. "Approved")
+                            
+                            events.append({
+                                "id": f"slack_{reply['ts']}",
+                                "text": r_text,
+                                "timestamp": datetime.fromtimestamp(float(reply['ts'])).isoformat(),
+                                "actor": r_actor,
+                                "source": "slack",
+                                "signal_type": _classify_signal(r_text),
+                                "thread_role": "thread_reply",
+                                "metadata": {"channel": channel, "root_ts": ts}
+                            })
+                    except Exception as e:
+                        print(f"Error fetching replies for {ts}: {e}")
+
         return events
-    except SlackApiError as e:
-        print(f"Slack API Error: {e}")
+    except Exception as e:
+        print(f"Slack Client Error: {e}")
         return []
 
 
 def fetch_jira_issues(api_key: str, project: str) -> List[Dict[str, Any]]:
     """Fetch issues from Jira project"""
+    
+    # Fallback to env vars if inputs are placeholders
+    jira_server = os.getenv("JIRA_SERVER", "https://your-domain.atlassian.net")
+    jira_email = os.getenv("JIRA_EMAIL", "")
+    
+    # If using UI input "env", load from backend env
+    if api_key == "env":
+        api_key = os.getenv("JIRA_API_TOKEN", "")
+    
     if not api_key or not project:
-        # Return mock data for MVP
-        return [
-            {
-                "id": "jira_1",
-                "text": "PROJ-123: Bug fix - Login page not responsive on mobile",
-                "timestamp": datetime.now().isoformat(),
-                "actor": "Carol",
-                "source": "jira",
-                "metadata": {"status": "In Progress", "priority": "High"}
-            },
-            {
-                "id": "jira_2",
-                "text": "PROJ-124: Feature - Add dark mode support",
-                "timestamp": datetime.now().isoformat(),
-                "actor": "David",
-                "source": "jira",
-                "metadata": {"status": "To Do", "priority": "Medium"}
-            }
-        ]
+         # Return mock data for MVP if no creds
+        if not os.getenv("JIRA_API_TOKEN"):
+             return [
+                {
+                    "id": "jira_1",
+                    "text": "PROJ-123: Bug fix - Login page not responsive on mobile",
+                    "timestamp": datetime.now().isoformat(),
+                    "actor": "Carol",
+                    "source": "jira",
+                    "metadata": {"status": "In Progress", "priority": "High"}
+                },
+                {
+                    "id": "jira_2",
+                    "text": "PROJ-124: Feature - Add dark mode support",
+                    "timestamp": datetime.now().isoformat(),
+                    "actor": "David",
+                    "source": "jira",
+                    "metadata": {"status": "To Do", "priority": "Medium"}
+                }
+            ]
     
     try:
-        # In production, use proper Jira credentials
-        jira_server = os.getenv("JIRA_SERVER", "https://your-domain.atlassian.net")
-        jira = JIRA(server=jira_server, token_auth=api_key)
+        # Jira Cloud requires Email + API Token (Basic Auth)
+        # Verify if we have an email, otherwise try token_auth (PAT)
+        if jira_email and "@" in jira_email:
+             # Basic Auth (Cloud standard)
+             jira_options = {'server': jira_server}
+             jira = JIRA(options=jira_options, basic_auth=(jira_email, api_key))
+        else:
+             # PAT or Server/DC
+             jira = JIRA(server=jira_server, token_auth=api_key)
         
-        issues = jira.search_issues(f'project={project}', maxResults=50)
+        print(f"Connecting to Jira: {jira_server} for project {project}")
+        issues = jira.search_issues(f'project={project} ORDER BY created DESC', maxResults=50)
         events = []
         
         for issue in issues:
+            # Extract status safely
+            status = issue.fields.status.name if hasattr(issue.fields, "status") else "Unknown"
+            priority = issue.fields.priority.name if hasattr(issue.fields, "priority") and issue.fields.priority else "None"
+            
             events.append({
                 "id": f"jira_{issue.key}",
-                "text": f"{issue.key}: {issue.fields.summary}",
+                "text": f"{issue.key}: {issue.fields.summary} ({status})",
                 "timestamp": issue.fields.created,
-                "actor": issue.fields.reporter.displayName if issue.fields.reporter else "unknown",
+                "actor": issue.fields.reporter.displayName if hasattr(issue.fields, "reporter") and issue.fields.reporter else "unknown",
                 "source": "jira",
+                "signal_type": "status_update", # Default signal for Jira
                 "metadata": {
-                    "status": issue.fields.status.name,
-                    "priority": issue.fields.priority.name if issue.fields.priority else "None"
+                    "status": status,
+                    "priority": priority,
+                    "url": f"{jira_server}/browse/{issue.key}"
                 }
             })
         
         return events
     except Exception as e:
         print(f"Jira API Error: {e}")
+        # import traceback
+        # traceback.print_exc()
+        # Return empty list instead of crashing, but print error
         return []
 
 

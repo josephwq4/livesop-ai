@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from '../lib/supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -7,6 +8,17 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Add Authorization Header to every request
+api.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
+  }
+
+  return config;
 });
 
 // Workflows API
@@ -21,7 +33,7 @@ export const runInference = async (teamId) => {
 };
 
 export const fetchSOP = async (teamId, workflowId = null) => {
-  const url = workflowId 
+  const url = workflowId
     ? `/workflows/${teamId}/sop?workflow_id=${workflowId}`
     : `/workflows/${teamId}/sop`;
   const response = await api.get(url);
@@ -80,7 +92,7 @@ export const fetchGmailThreads = async (credentials, label = 'INBOX') => {
 export const uploadCSV = async (teamId, file) => {
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const response = await api.post(`/integrations/csv/upload`, formData, {
     params: { team_id: teamId },
     headers: {

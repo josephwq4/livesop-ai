@@ -1,6 +1,27 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
+from pathlib import Path
+
+# Build path to backend/.env
+# app/main.py -> backend/app/main.py. Parent is backend/app. Parent.parent is backend.
+env_path = Path(__file__).resolve().parent.parent / ".env"
+print(f"Loading env from: {env_path}")
+load_dotenv(dotenv_path=env_path)
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
 from app.routes import integrations, workflows, automations
+from app.dependencies.auth import get_current_user
+
+from app.middleware.logging import AuditLoggingMiddleware
+
+# Initialize Rate Limiter
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="LiveSOP AI",
@@ -8,40 +29,59 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Register Limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# Register Audit Logging
+app.add_middleware(AuditLoggingMiddleware)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],  # In production, replace with exact frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(integrations.router, prefix="/integrations")
-app.include_router(workflows.router, prefix="/workflows")
-app.include_router(automations.router, prefix="/automations")
+# Include routers with Authentication Lock
+print("[INFO] Loading routers with Auth Enabled")
+app.include_router(
+    integrations.router, 
+    prefix="/integrations", 
+    dependencies=[Depends(get_current_user)]
+)
+
+app.include_router(
+    workflows.router, 
+    prefix="/workflows", 
+    dependencies=[Depends(get_current_user)]
+)
+app.include_router(
+    automations.router, 
+    prefix="/automations", 
+    dependencies=[Depends(get_current_user)]
+)
 
 
 @app.get("/")
-def root():
-    """Root endpoint"""
+@limiter.limit("50/minute")
+def root(request: Request):
+    """Root endpoint (Public)"""
     return {
         "message": "Welcome to LiveSOP AI",
         "version": "1.0.0",
         "status": "running",
-        "endpoints": {
-            "integrations": "/integrations",
-            "workflows": "/workflows",
-            "automations": "/automations",
-            "docs": "/docs"
-        }
+        "auth": "enabled"
     }
 
 
 @app.get("/health")
-def health_check():
-    """Health check endpoint"""
+@limiter.limit("100/minute")
+def health_check(request: Request):
+    """Health check endpoint (Public)"""
     return {
         "status": "healthy",
         "service": "LiveSOP AI Backend"

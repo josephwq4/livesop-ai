@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { fetchWorkflows, runAutomation, runInference, fetchSOP } from '../services/api';
+import { fetchWorkflows, runAutomation, runInference, fetchSOP, fetchWorkflowHistory } from '../services/api';
 import WorkflowCard from '../components/WorkflowCard';
+import WorkflowSkeleton from '../components/WorkflowSkeleton';
 import FlowChart from '../components/FlowChart';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -11,7 +12,9 @@ import {
     Loader2,
     Sparkles,
     Network,
-    List
+    List,
+    History,
+    X
 } from 'lucide-react';
 
 import Navbar from '../components/Navbar';
@@ -23,6 +26,8 @@ export default function Dashboard() {
     const [inferring, setInferring] = useState(false);
     const [view, setView] = useState('cards'); // 'cards', 'flowchart', 'sop'
     const [notification, setNotification] = useState(null);
+    const [history, setHistory] = useState([]);
+    const [showHistory, setShowHistory] = useState(false);
 
     const [realTeamId, setRealTeamId] = useState(null);
 
@@ -30,6 +35,7 @@ export default function Dashboard() {
 
     useEffect(() => {
         loadWorkflows();
+        loadHistory();
     }, []);
 
     // Real-time Subscription
@@ -66,13 +72,22 @@ export default function Dashboard() {
         });
     }, [realTeamId]);
 
-    const loadWorkflows = async () => {
+    const loadHistory = async () => {
+        try {
+            const data = await fetchWorkflowHistory(teamId);
+            if (data.history) setHistory(data.history);
+        } catch (error) {
+            console.error('Error loading history:', error);
+        }
+    };
+
+    const loadWorkflows = async (workflowId = null) => {
         try {
             setLoading(true);
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Request timeout')), 10000)
             );
-            const dataPromise = fetchWorkflows(teamId);
+            const dataPromise = fetchWorkflows(teamId, workflowId);
 
             const data = await Promise.race([dataPromise, timeoutPromise]);
 
@@ -82,6 +97,7 @@ export default function Dashboard() {
             }
 
             setWorkflow(data.workflow);
+            setShowHistory(false);
         } catch (error) {
             console.error('Error loading workflows:', error);
             if (error.message !== 'Request timeout') {
@@ -175,13 +191,11 @@ export default function Dashboard() {
         setTimeout(() => setNotification(null), 5000);
     };
 
-    if (loading && !workflow) {
+    if (loading && !workflow && !history.length) {
+        // Only show full page loader if absolutely nothing is loaded
         return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center">
-                <div className="text-center">
-                    <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-                    <p className="text-gray-600 dark:text-gray-300 text-lg">Loading workflows...</p>
-                </div>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
             </div>
         );
     }
@@ -203,6 +217,13 @@ export default function Dashboard() {
             {/* Header Actions */}
             <div className="max-w-7xl mx-auto px-6 pt-8 pb-2">
                 <div className="flex items-center justify-end gap-3">
+                    <button
+                        onClick={() => setShowHistory(true)}
+                        className="flex items-center gap-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all"
+                    >
+                        <History className="w-5 h-5" />
+                        History
+                    </button>
                     <button
                         onClick={handleRunInference}
                         disabled={inferring}
@@ -337,6 +358,55 @@ export default function Dashboard() {
                     </>
                 )}
             </div>
+            {/* History Drawer */}
+            {showHistory && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity"
+                        onClick={() => setShowHistory(false)}
+                    ></div>
+
+                    {/* Drawer */}
+                    <div className="relative w-96 bg-white dark:bg-gray-900 h-full shadow-2xl p-6 overflow-y-auto border-l border-gray-200 dark:border-gray-700 animate-slide-in-right">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-xl font-bold dark:text-white flex items-center gap-2">
+                                <History className="w-5 h-5" />
+                                Version History
+                            </h2>
+                            <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                                <X className="w-5 h-5 dark:text-white" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {history.map((h) => (
+                                <div
+                                    key={h.id}
+                                    onClick={() => loadWorkflows(h.id)}
+                                    className={`p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md ${workflow?.workflow_id === h.id
+                                        ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-700'
+                                        : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-blue-200'
+                                        }`}
+                                >
+                                    <div className="font-semibold text-gray-900 dark:text-white mb-1">
+                                        {h.title || "Untitled Workflow"}
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs text-gray-500">
+                                        <span>{new Date(h.created_at).toLocaleString()}</span>
+                                        {h.is_active && (
+                                            <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                                                Active
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
+        </div >
     );
 }

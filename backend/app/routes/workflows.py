@@ -9,8 +9,9 @@ router = APIRouter(tags=["workflows"])
 
 @router.get("/{team_id}/workflows")
 
-def get_workflows(team_id: str, current_user: dict = Depends(get_current_user)):
-    """Get active inferred workflow for the authenticated user's team"""
+
+def get_workflows(team_id: str, current_user: dict = Depends(get_current_user), workflow_id: Optional[str] = None):
+    """Get active inferred workflow or specific version for the authenticated user's team"""
     try:
         from app.repositories.persistence import PersistenceRepository
         repo = PersistenceRepository()
@@ -19,7 +20,10 @@ def get_workflows(team_id: str, current_user: dict = Depends(get_current_user)):
         user_id = current_user.get("sub")
         real_team_id = repo.get_or_create_team(f"Team {user_id[:4]}", user_id)
         
-        workflow_graph = repo.get_active_workflow(real_team_id)
+        if workflow_id:
+            workflow_graph = repo.get_workflow_by_id(workflow_id, real_team_id)
+        else:
+            workflow_graph = repo.get_active_workflow(real_team_id)
         
         # If no persistent workflow, return empty structure (Frontend handles "No Workflows Yet")
         if not workflow_graph:
@@ -27,7 +31,7 @@ def get_workflows(team_id: str, current_user: dict = Depends(get_current_user)):
                 "success": True,
                 "team_id": real_team_id,
                 "workflow": None,
-                "message": "No active workflow found"
+                "message": "No workflow found"
             }
             
         return {
@@ -37,6 +41,24 @@ def get_workflows(team_id: str, current_user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching workflows: {str(e)}")
+
+@router.get("/{team_id}/history")
+def get_history(team_id: str, current_user: dict = Depends(get_current_user)):
+    """Get workflow version history"""
+    try:
+        from app.repositories.persistence import PersistenceRepository
+        repo = PersistenceRepository()
+        
+        user_id = current_user.get("sub")
+        real_team_id = repo.get_or_create_team(f"Team {user_id[:4]}", user_id)
+        
+        history = repo.get_workflow_history(real_team_id)
+        return {
+            "success": True, 
+            "history": history
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching history: {str(e)}")
 
 
 @router.post("/{team_id}/infer")

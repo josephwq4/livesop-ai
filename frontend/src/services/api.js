@@ -22,8 +22,16 @@ api.interceptors.request.use(async (config) => {
 });
 
 // Workflows API
-export const fetchWorkflows = async (teamId) => {
-  const response = await api.get(`/workflows/${teamId}/workflows`);
+export const fetchWorkflows = async (teamId, workflowId = null) => {
+  let url = `/workflows/${teamId}/workflows`;
+  if (workflowId) url += `?workflow_id=${workflowId}`;
+
+  const response = await api.get(url);
+  return response.data;
+};
+
+export const fetchWorkflowHistory = async (teamId) => {
+  const response = await api.get(`/workflows/${teamId}/history`);
   return response.data;
 };
 

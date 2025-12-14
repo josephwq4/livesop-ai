@@ -152,60 +152,81 @@ class PersistenceRepository:
             print(f"[DB Error] Save Workflow Failed: {e}")
             # If workflow was created, we might want to delete it?
             # Or reliance on 'inference_run' status=failed is enough.
+    def _assemble_workflow_graph(self, workflow: Dict) -> Dict:
+        """Helper to reconstruct graph from DB row"""
+        wf_id = workflow["id"]
+        
+        # Get Nodes
+        n_res = self.db.table("workflow_nodes").select("*").eq("workflow_id", wf_id).execute()
+        nodes = []
+        for row in n_res.data:
+            nodes.append({
+                "id": row["step_id"],
+                "type": row["type"],
+                "data": {
+                    "label": row["label"],
+                    "description": row["description"],
+                    "actor": row["actor"],
+                    **row["metadata"]
+                }
+            })
+            
+        # Get Edges
+        e_res = self.db.table("workflow_edges").select("*").eq("workflow_id", wf_id).execute()
+        edges = []
+        for row in e_res.data:
+            edges.append({
+                "source": row["source_step_id"],
+                "target": row["target_step_id"],
+                "label": row["label"]
+            })
+            
+        return {
+            "workflow_id": wf_id,
+            "team_id": workflow["team_id"],
+            "title": workflow["title"],
+            "created_at": workflow["created_at"],
+            "is_active": workflow["is_active"],
+            "nodes": nodes,
+            "edges": edges
+        }
+
     def get_active_workflow(self, team_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieves the currently active workflow graph for the team.
-        Reconstructs Nodes and Edges from normalized tables.
-        """
+        """Retrieves the currently active workflow graph."""
         try:
-            # 1. Get Workflow Header
             w_res = self.db.table("workflows").select("*")\
                 .eq("team_id", team_id)\
                 .eq("is_active", True)\
                 .maybe_single()\
                 .execute()
             
-            if not w_res.data:
-                return None
-                
-            workflow = w_res.data
-            wf_id = workflow["id"]
-            
-            # 2. Get Nodes
-            n_res = self.db.table("workflow_nodes").select("*").eq("workflow_id", wf_id).execute()
-            nodes = []
-            for row in n_res.data:
-                # Reconstruct React Flow Node usage
-                nodes.append({
-                    "id": row["step_id"],
-                    "type": row["type"],
-                    "data": {
-                        "label": row["label"],
-                        "description": row["description"],
-                        "actor": row["actor"],
-                        **row["metadata"] # Spread extra metadata
-                    }
-                })
-                
-            # 3. Get Edges
-            e_res = self.db.table("workflow_edges").select("*").eq("workflow_id", wf_id).execute()
-            edges = []
-            for row in e_res.data:
-                edges.append({
-                    "source": row["source_step_id"],
-                    "target": row["target_step_id"],
-                    "label": row["label"]
-                })
-                
-            return {
-                "workflow_id": wf_id,
-                "team_id": team_id,
-                "title": workflow["title"],
-                "created_at": workflow["created_at"],
-                "nodes": nodes,
-                "edges": edges
-            }
-            
+            if not w_res.data: return None
+            return self._assemble_workflow_graph(w_res.data)
         except Exception as e:
             print(f"[DB Error] Get Active Workflow: {e}")
+            return None
+
+    def get_workflow_history(self, team_id: str, limit: int = 20) -> List[Dict]:
+        """Fetch list of workflow summaries"""
+        try:
+            res = self.db.table("workflows")\
+                .select("id, title, created_at, is_active")\
+                .eq("team_id", team_id)\
+                .order("created_at", desc=True)\
+                .limit(limit)\
+                .execute()
+            return res.data
+        except Exception as e:
+            print(f"[DB Error] History: {e}")
+            return []
+
+    def get_workflow_by_id(self, workflow_id: str, team_id: str) -> Optional[Dict]:
+        """Fetch specific workflow version"""
+        try:
+            # Enforce team ownership
+            w_res = self.db.table("workflows").select("*").eq("id", workflow_id).eq("team_id", team_id).maybe_single().execute()
+            if not w_res.data: return None
+            return self._assemble_workflow_graph(w_res.data)
+        except Exception as e:
+            print(f"[DB Error] Get By ID: {e}")
             return None

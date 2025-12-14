@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchWorkflows, runAutomation, runInference, fetchSOP, fetchWorkflowHistory } from '../services/api';
+import { fetchWorkflows, runAutomation, runInference, fetchSOP, fetchWorkflowHistory, searchKnowledge } from '../services/api';
 import WorkflowCard from '../components/WorkflowCard';
 import WorkflowSkeleton from '../components/WorkflowSkeleton';
 import FlowChart from '../components/FlowChart';
@@ -14,6 +14,7 @@ import {
     Network,
     List,
     History,
+    Search,
     X
 } from 'lucide-react';
 
@@ -28,6 +29,12 @@ export default function Dashboard() {
     const [notification, setNotification] = useState(null);
     const [history, setHistory] = useState([]);
     const [showHistory, setShowHistory] = useState(false);
+
+    // Search State
+    const [showSearch, setShowSearch] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
 
     const [realTeamId, setRealTeamId] = useState(null);
 
@@ -186,6 +193,21 @@ export default function Dashboard() {
         }
     };
 
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        if (!searchQuery.trim()) return;
+        setIsSearching(true);
+        try {
+            const data = await searchKnowledge(teamId, searchQuery);
+            if (data.results) setSearchResults(data.results);
+        } catch (err) {
+            console.error(err);
+            showNotification('Search failed', 'error');
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
     const showNotification = (message, type = 'info') => {
         setNotification({ message, type });
         setTimeout(() => setNotification(null), 5000);
@@ -217,6 +239,13 @@ export default function Dashboard() {
             {/* Header Actions */}
             <div className="max-w-7xl mx-auto px-6 pt-8 pb-2">
                 <div className="flex items-center justify-end gap-3">
+                    <button
+                        onClick={() => setShowSearch(true)}
+                        className="flex items-center gap-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all"
+                    >
+                        <Search className="w-5 h-5" />
+                        Search
+                    </button>
                     <button
                         onClick={() => setShowHistory(true)}
                         className="flex items-center gap-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 transition-all"
@@ -402,6 +431,57 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Search Modal */}
+            {showSearch && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowSearch(false)}></div>
+                    <div className="relative bg-white dark:bg-gray-900 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
+                        <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                            <h2 className="text-xl font-bold flex items-center gap-2 dark:text-white">
+                                <Search className="w-5 h-5 text-blue-600" />
+                                Smart Context
+                            </h2>
+                            <button onClick={() => setShowSearch(false)}><X className="w-5 h-5 dark:text-gray-400" /></button>
+                        </div>
+                        <div className="p-6">
+                            <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Ask about past incidents, logic, or decisions..."
+                                    className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isSearching}
+                                    className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {isSearching ? <Loader2 className="animate-spin" /> : 'Ask AI'}
+                                </button>
+                            </form>
+
+                            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+                                {searchResults.map((res) => (
+                                    <div key={res.id} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                                        <div className="text-sm text-gray-500 mb-2 flex justify-between">
+                                            <span>Similarity: {(res.similarity * 100).toFixed(1)}%</span>
+                                            <span>{new Date(res.occurred_at).toLocaleString()}</span>
+                                        </div>
+                                        <p className="text-gray-800 dark:text-gray-200 leading-relaxed">
+                                            {res.content}
+                                        </p>
+                                    </div>
+                                ))}
+                                {searchResults.length === 0 && !isSearching && searchQuery && (
+                                    <div className="text-center text-gray-400 py-8">No relevant context found.</div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

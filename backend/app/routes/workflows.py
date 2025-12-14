@@ -61,6 +61,37 @@ def get_history(team_id: str, current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"Error fetching history: {str(e)}")
 
 
+@router.get("/{team_id}/search")
+def search_knowledge(
+    team_id: str, 
+    q: str, 
+    current_user: dict = Depends(get_current_user)
+):
+    """Semantic Search (RAG) over team signals"""
+    try:
+        from app.repositories.persistence import PersistenceRepository
+        from app.services.workflow_inference import generate_embeddings
+        
+        repo = PersistenceRepository()
+        
+        # Resolve Team
+        user_id = current_user.get("sub")
+        real_team_id = repo.get_or_create_team(f"Team {user_id[:4]}", user_id)
+        
+        # 1. Embed Query
+        vectors = generate_embeddings([q])
+        if not vectors:
+             return {"success": False, "results": []}
+             
+        # 2. Search DB
+        results = repo.search_signals(real_team_id, vectors[0])
+        return {"success": True, "results": results}
+        
+    except Exception as e:
+        print(f"Search Error: {e}")
+        raise HTTPException(status_code=500, detail="Search failed")
+
+
 @router.post("/{team_id}/infer")
 def run_inference(team_id: str, current_user: dict = Depends(get_current_user)):
     """Run workflow inference for a team"""

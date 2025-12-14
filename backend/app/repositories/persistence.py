@@ -58,6 +58,23 @@ class PersistenceRepository:
             print(f"[DB Error] Ingest Signals: {e}")
             raise e
 
+    def search_signals(self, team_id: str, vector: List[float], limit: int = 5, threshold: float = 0.7) -> List[Dict]:
+        """
+        RAG: Search for similar signals using Vector Similarity.
+        Requires 'match_signals' DB function.
+        """
+        try:
+            res = self.db.rpc("match_signals", {
+                "query_embedding": vector,
+                "match_threshold": threshold,
+                "match_count": limit,
+                "filter_team_id": team_id
+            }).execute()
+            return res.data
+        except Exception as e:
+            print(f"[DB Error] Vector Search: {e}")
+            return []
+
     # --- INFERENCE RUNS ---
     def create_inference_run(self, team_id: str, trigger_type: str, config: Dict = {}) -> str:
         """Starts a new Audit Log entry. Returns Run ID."""

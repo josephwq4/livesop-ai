@@ -35,6 +35,11 @@ export const fetchWorkflowHistory = async (teamId) => {
   return response.data;
 };
 
+export const searchKnowledge = async (teamId, query) => {
+  const response = await api.get(`/workflows/${teamId}/search?q=${encodeURIComponent(query)}`);
+  return response.data;
+};
+
 export const runInference = async (teamId) => {
   const response = await api.post(`/workflows/${teamId}/infer`);
   return response.data;

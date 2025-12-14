@@ -24,30 +24,69 @@ export default function Dashboard() {
     const [view, setView] = useState('cards'); // 'cards', 'flowchart', 'sop'
     const [notification, setNotification] = useState(null);
 
-    const teamId = 'team123'; // In production, get from auth context
+    const [realTeamId, setRealTeamId] = useState(null);
+
+    const teamId = 'team123'; // Placeholder for API calls until AuthContext provides it
 
     useEffect(() => {
         loadWorkflows();
     }, []);
 
+    // Real-time Subscription
+    useEffect(() => {
+        if (!realTeamId) return;
+
+        // Import supabase client dynamically or expect it from import
+        // We need to import it at top, I'll add import line separately.
+        // Assuming imports exist.
+
+        import('../lib/supabase').then(({ supabase }) => {
+            if (!supabase) return;
+
+            const channel = supabase
+                .channel(`signals-${realTeamId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'raw_signals',
+                        filter: `team_id=eq.${realTeamId}`
+                    },
+                    (payload) => {
+                        const newSignal = payload.new;
+                        showNotification(`New ${newSignal.source} signal: ${newSignal.content.substring(0, 40)}...`, 'info');
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        });
+    }, [realTeamId]);
+
     const loadWorkflows = async () => {
         try {
             setLoading(true);
-            // Add timeout to prevent hanging
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Request timeout')), 10000)
             );
             const dataPromise = fetchWorkflows(teamId);
 
             const data = await Promise.race([dataPromise, timeoutPromise]);
+
+            // Capture Real Team ID from Backend
+            if (data.team_id) {
+                setRealTeamId(data.team_id);
+            }
+
             setWorkflow(data.workflow);
         } catch (error) {
             console.error('Error loading workflows:', error);
-            // Don't show error on initial load if just empty
             if (error.message !== 'Request timeout') {
-                showNotification('Could not load workflows. Click "Run Inference" to generate.', 'info');
+                showNotification('Could not load workflows.', 'info');
             }
-            // Set empty workflow so page doesn't hang
             setWorkflow({ nodes: [], edges: [] });
         } finally {
             setLoading(false);

@@ -258,6 +258,20 @@ def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:
             "edges": [],
             "message": "No events found. Please connect integrations."
         }
+
+    # Generate Embeddings for Semantic Search
+    try:
+        print(f"[Inference] Generating embeddings for {len(events)} events...")
+        texts = [e["text"] for e in events]
+        # Use existing helper to get vectors
+        vectors = generate_embeddings(texts)
+        if len(vectors) == len(events):
+            for i, vec in enumerate(vectors):
+                events[i]["embedding"] = vec
+        else:
+            print(f"[Warn] Embedding count mismatch. Skipping.")
+    except Exception as e:
+        print(f"[Warn] Embedding generation failed: {e}")
         
     try:
         # 4. Ingest Raw Signals (Persist the Data Lake)

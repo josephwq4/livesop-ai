@@ -44,6 +44,7 @@ class PersistenceRepository:
                 "actor": s.get("actor", "unknown"),
                 "content": s.get("text", ""),
                 "metadata": s.get("metadata", {}),
+                "embedding": s.get("embedding"), # Support for Vector Search
                 "occurred_at": s.get("timestamp") or datetime.now(timezone.utc).isoformat()
             })
 

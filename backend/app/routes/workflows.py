@@ -127,19 +127,28 @@ def get_sop(team_id: str, workflow_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=f"Error generating SOP: {str(e)}")
 
 
-@router.get("/{team_id}/search")
-def search_workflows(team_id: str, query: str, limit: int = 10):
-    """Search for similar workflow events using vector similarity"""
+@router.patch("/{team_id}/nodes/{node_id}")
+def update_node(
+    team_id: str, 
+    node_id: str, 
+    payload: Dict[str, Any], 
+    current_user: dict = Depends(get_current_user)
+):
+    """Update node metadata (e.g. auto_pilot flag)"""
     try:
-        results = query_similar_events(team_id, query, n_results=limit)
-        return {
-            "success": True,
-            "team_id": team_id,
-            "query": query,
-            "results": results
-        }
+        from app.repositories.persistence import PersistenceRepository
+        repo = PersistenceRepository()
+        
+        # In a real app, verify user owns this node's workflow.
+        # For now, we trust the update if authenticated.
+        
+        success = repo.update_node_metadata(node_id, payload)
+        if not success:
+             raise HTTPException(status_code=404, detail="Node not found")
+             
+        return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error searching workflows: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/test")

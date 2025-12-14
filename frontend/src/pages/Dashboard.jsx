@@ -352,6 +352,7 @@ export default function Dashboard() {
                                         key={step.id}
                                         step={step}
                                         runAutomation={handleRunAutomation}
+                                        teamId={realTeamId}
                                     />
                                 ))}
                             </div>

@@ -208,6 +208,25 @@ class PersistenceRepository:
             "edges": edges
         }
 
+    def update_node_metadata(self, node_id: str, metadata_update: Dict) -> bool:
+        """Updates the metadata of a specific node (e.g. toggling auto-pilot)"""
+        try:
+            # 1. Fetch current metadata
+            res = self.db.table("workflow_nodes").select("metadata").eq("step_id", node_id).single().execute()
+            if not res.data:
+                return False
+            
+            current_meta = res.data["metadata"] or {}
+            # 2. Merge updates
+            updated_meta = {**current_meta, **metadata_update}
+            
+            # 3. Save
+            self.db.table("workflow_nodes").update({"metadata": updated_meta}).eq("step_id", node_id).execute()
+            return True
+        except Exception as e:
+            print(f"[DB Error] Update Node: {e}")
+            return False
+
     def get_active_workflow(self, team_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves the currently active workflow graph."""
         try:

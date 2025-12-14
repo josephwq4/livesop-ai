@@ -60,6 +60,11 @@ export const searchWorkflows = async (teamId, query, limit = 10) => {
   return response.data;
 };
 
+export const updateNode = async (teamId, nodeId, payload) => {
+  const response = await api.patch(`/workflows/${teamId}/nodes/${nodeId}`, payload);
+  return response.data;
+};
+
 // Automations API
 export const runAutomation = async (teamId, payload) => {
   const response = await api.post(`/automations/${teamId}/execute`, payload);

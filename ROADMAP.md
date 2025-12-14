@@ -7,32 +7,30 @@
 - [x] **AI Inference**: GPT-4 based workflow extraction.
 - [x] **Persistence**: Full Supabase PostgreSQL storage with History.
 - [x] **Real-Time**: WebSocket updates for new signals.
+- [x] **Auth**: Enterprise Multi-User Authentication (Supabase).
 
 **Agentic Capabilities**
 - [x] **Automations**: One-click execution (Post to Slack, Create Jira Ticket).
-- [x] **Memory**: Vector embeddings generated for all incoming data.
+- [x] **Memory (RAG)**: Semantic Search over historical context.
+- [x] **Auto-Pilot Config**: Toggle nodes to run automatically.
 
 **User Experience**
 - [x] **Dashboard**: Interactive Graph & Kanban views.
 - [x] **History**: Time-travel to previous workflow versions.
-- [x] **Skeletons**: polished loading states.
+- [x] **Lifecycle**: Landing Page, Settings, User Profile.
 
 ---
 
-## 🟡 Upcoming (Phase 5+)
+## 🟡 Upcoming (Phase 8+)
 
-**1. Smart Context / RAG (In Progress)**
-- *Goal*: Enable the AI to "remember" past incidents and suggest solutions based on history.
-- *Tech*: pgvector similarity search on `raw_signals`.
+**1. Real-Time Webhooks**
+- *Goal*: Eliminate manual fetching. Listen to Slack/Jira events in real-time.
+- *Tech*: Public API endpoints + Signature Verification.
 
-**2. Multi-User Authentication**
-- *Goal*: Secure login for enterprise teams.
-- *Tech*: Supabase Auth integration.
+**2. Auto-Pilot Engine**
+- *Goal*: Background workers that execute "Auto-Pilot" nodes without user intervention.
+- *Tech*: Async Task Queue (Celery/Arq) or Cron-based runner.
 
-**3. Auto-Pilot Mode**
-- *Goal*: Set specific workflow nodes to run automatically without human approval.
-- *Tech*: Background job scheduler + Confidence Thresholds.
+**3. Advanced SOP Editor**
+- *Goal*: Allow manual editing of the generated SOP markdown.
 
-**4. Webhooks**
-- *Goal*: Real-time, push-based data ingestion.
-- *Tech*: Public API endpoints for Slack/Jira webhooks.

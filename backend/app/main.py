@@ -15,7 +15,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.routes import integrations, workflows, automations
+from app.routes import integrations, workflows, automations, webhooks
 from app.dependencies.auth import get_current_user
 
 from app.middleware.logging import AuditLoggingMiddleware
@@ -68,6 +68,12 @@ app.include_router(
     automations.router, 
     prefix="/automations", 
     dependencies=[Depends(get_current_user)]
+)
+
+# Webhooks (Public endpoint with Internal Signature Verification)
+app.include_router(
+    webhooks.router,
+    prefix="/webhooks"
 )
 
 

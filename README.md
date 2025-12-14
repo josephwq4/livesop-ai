@@ -214,8 +214,11 @@ dist
 
 ✅ Workflow Inference from Slack/Jira/Gmail  
 ✅ AI-powered workflow graph generation  
+✅ **Persistent Database Storage (Supabase)**  
+✅ **Real-Time Signal Updates**  
+✅ **Workflow Version History**  
 ✅ Living SOP document creation  
-✅ One-click automation execution  
+✅ One-click automation execution (Jira/Slack)  
 ✅ Vector DB storage for context  
 ✅ Interactive workflow visualization  
 ✅ Multi-tenant architecture  

@@ -120,9 +120,9 @@ export default function Dashboard() {
         try {
             setInferring(true);
 
-            // Add 15 second timeout for inference
+            // Add 60 second timeout for inference
             const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Inference timeout')), 15000)
+                setTimeout(() => reject(new Error('Inference timeout')), 60000)
             );
             const inferencePromise = runInference(teamId);
 

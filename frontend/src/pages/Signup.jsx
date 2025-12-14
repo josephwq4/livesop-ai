@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, AlertCircle } from 'lucide-react';
+import { Loader2, UserPlus, AlertCircle } from 'lucide-react';
 
-export default function Login() {
-    const { signIn } = useAuth();
+export default function Signup() {
+    const { signUp } = useAuth();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -15,7 +15,7 @@ export default function Login() {
         setError('');
         setLoading(true);
 
-        const { data, error } = await signIn({
+        const { data, error } = await signUp({
             email: formData.email,
             password: formData.password
         });
@@ -23,7 +23,9 @@ export default function Login() {
         if (error) {
             setError(error.message);
         } else if (data.user) {
-            navigate('/dashboard');
+            // Check if email confirmation is required (Supabase default)
+            alert("Account created! Please check your email to confirm if required.");
+            navigate('/login');
         }
         setLoading(false);
     };
@@ -33,9 +35,9 @@ export default function Login() {
             <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-8">
                 <div className="text-center mb-8">
                     <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-                        Welcome Back
+                        Create Account
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2">Sign in to your LiveSOP Dashboard</p>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">Join LiveSOP AI today</p>
                 </div>
 
                 {error && (
@@ -61,6 +63,7 @@ export default function Login() {
                         <input
                             type="password"
                             required
+                            minLength={6}
                             className="w-full px-4 py-2 rounded-lg border dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 outline-none"
                             value={formData.password}
                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -72,14 +75,14 @@ export default function Login() {
                         disabled={loading}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center gap-2"
                     >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
-                        Sign In
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+                        Sign Up
                     </button>
                 </form>
 
                 <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-                    Don't have an account?{' '}
-                    <Link to="/signup" className="text-blue-600 hover:underline font-medium">Create one</Link>
+                    Already have an account?{' '}
+                    <Link to="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>
                 </div>
             </div>
         </div>

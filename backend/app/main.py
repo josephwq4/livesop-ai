@@ -40,7 +40,12 @@ app.add_middleware(AuditLoggingMiddleware)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with exact frontend URL
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173", 
+        "https://livesopai.vercel.app",  # Your Production URL
+        "https://livesop-ai.vercel.app"  # Alternative (just in case)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

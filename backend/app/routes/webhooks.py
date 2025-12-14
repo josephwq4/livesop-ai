@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Header
 from app.services.integration_clients import _classify_signal
 from app.repositories.persistence import PersistenceRepository
+from app.services.trigger_engine import evaluate_signal
 import os
 import json
 import hmac
@@ -54,6 +55,9 @@ async def process_slack_event(event: dict, slack_team_id: str):
         # Insert
         repo.ingest_signals(target_team_id, [new_signal])
         print(f"✅ [Webhook] Ingested signal from {actor}: {text[:30]}... -> Team {target_team_id}")
+        
+        # Trigger Auto-Pilot Evaluation
+        evaluate_signal(target_team_id, new_signal)
         
     except Exception as e:
         print(f"❌ [Webhook] Error processing event: {e}")

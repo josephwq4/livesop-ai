@@ -13,6 +13,8 @@
 - [x] **Automations**: One-click execution (Post to Slack, Create Jira Ticket).
 - [x] **Memory (RAG)**: Semantic Search over historical context.
 - [x] **Auto-Pilot Config**: Toggle nodes to run automatically.
+- [x] **Webhooks**: Real-Time Slack Event Signature Verification.
+- [x] **Auto-Pilot Engine**: Reactive Trigger Loop (Signal -> Match -> Execute).
 
 **User Experience**
 - [x] **Dashboard**: Interactive Graph & Kanban views.
@@ -21,16 +23,9 @@
 
 ---
 
-## 🟡 Upcoming (Phase 8+)
+## 🟡 Upcoming (Phase 10+)
 
-**1. Real-Time Webhooks**
-- *Goal*: Eliminate manual fetching. Listen to Slack/Jira events in real-time.
-- *Tech*: Public API endpoints + Signature Verification.
-
-**2. Auto-Pilot Engine**
-- *Goal*: Background workers that execute "Auto-Pilot" nodes without user intervention.
-- *Tech*: Async Task Queue (Celery/Arq) or Cron-based runner.
-
-**3. Advanced SOP Editor**
+**1. Advanced SOP Editor**
 - *Goal*: Allow manual editing of the generated SOP markdown.
+
 

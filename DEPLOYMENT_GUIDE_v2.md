@@ -98,4 +98,22 @@ Your backend currently blocks requests from unknown domains for security. You mu
 - [ ] Frontend has `VITE_API_URL` pointing to backend
 - [ ] You can log in and view the dashboard
 
+---
+
+## 🔗 Step 5: Configure Webhooks & Integrations
+
+To enable Real-Time Auto-Pilot, you must configure Slack:
+
+1.  **Render Environment Variables**:
+    *   Add `SLACK_SIGNING_SECRET`: Get this from api.slack.com -> App Credentials.
+    *   Add `SLACK_TOKEN`: Bot User OAuth Token (xoxb-...) for sending messages.
+    *   Add `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`: For persistence.
+
+2.  **Slack App Configuration**:
+    *   Go to **Interactivity & Shortcuts** -> Enable.
+    *   Go to **Event Subscriptions** -> Enable.
+    *   **Request URL**: `https://your-backend.onrender.com/webhooks/slack`
+    *   Subscribe to Bot Events: `message.channels`, `message.im`.
+    *   **Reinstall App** to Workspace.
+
 **🎉 You are LIVE!**

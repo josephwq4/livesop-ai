@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.services.workflow_inference import infer_workflow, generate_sop_document, query_similar_events
 from app.models.workflow import WorkflowGraph
-from typing import Optional
+from typing import Optional, Dict, Any
 from app.dependencies.auth import get_current_user
 
 router = APIRouter(tags=["workflows"])

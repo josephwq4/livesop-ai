@@ -5,7 +5,6 @@ from slack_sdk.errors import SlackApiError
 from jira import JIRA
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-import pandas as pd
 from datetime import datetime
 
 
@@ -336,22 +335,26 @@ def fetch_gmail_threads(credentials_json: str, label: str) -> List[Dict[str, Any
         return []
 
 
+import csv
+import io
+
 def import_csv_buffer(content: bytes, team_id: str) -> List[Dict[str, Any]]:
-    """Import events from CSV content buffer"""
+    """Import events from CSV content buffer using (No Pandas)"""
     try:
-        import io
-        df = pd.read_csv(io.BytesIO(content))
-        events = []
+        # Decode bytes to string wrapper
+        text_stream = io.TextIOWrapper(io.BytesIO(content), encoding='utf-8')
+        reader = csv.DictReader(text_stream)
         
-        for idx, row in df.iterrows():
+        events = []
+        for idx, row in enumerate(reader):
             events.append({
                 "id": f"csv_{idx}",
-                "text": row.get("text", row.get("description", "")),
+                "text": row.get("text") or row.get("description", ""),
                 "timestamp": row.get("timestamp", datetime.now().isoformat()),
-                "actor": row.get("actor", row.get("user", "unknown")),
+                "actor": row.get("actor") or row.get("user", "unknown"),
                 "source": "csv",
                 "team_id": team_id,
-                "metadata": {k: str(v) for k, v in row.to_dict().items()} # Convert all metadata to strings
+                "metadata": dict(row)
             })
         
         return events
@@ -360,21 +363,21 @@ def import_csv_buffer(content: bytes, team_id: str) -> List[Dict[str, Any]]:
         return []
 
 def import_csv_events(file_path: str, team_id: str) -> List[Dict[str, Any]]:
-    """Import events from CSV file (Legacy)"""
+    """Import events from CSV file (No Pandas)"""
     try:
-        df = pd.read_csv(file_path)
         events = []
-        
-        for idx, row in df.iterrows():
-            events.append({
-                "id": f"csv_{idx}",
-                "text": row.get("text", row.get("description", "")),
-                "timestamp": row.get("timestamp", datetime.now().isoformat()),
-                "actor": row.get("actor", row.get("user", "unknown")),
-                "source": "csv",
-                "team_id": team_id,
-                "metadata": row.to_dict()
-            })
+        with open(file_path, mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for idx, row in enumerate(reader):
+                events.append({
+                    "id": f"csv_{idx}",
+                    "text": row.get("text") or row.get("description", ""),
+                    "timestamp": row.get("timestamp", datetime.now().isoformat()),
+                    "actor": row.get("actor") or row.get("user", "unknown"),
+                    "source": "csv",
+                    "team_id": team_id,
+                    "metadata": dict(row)
+                })
         
         return events
     except Exception as e:

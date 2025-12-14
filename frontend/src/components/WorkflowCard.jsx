@@ -11,13 +11,13 @@ export default function WorkflowCard({ step, runAutomation }) {
                     {/* Step title */}
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
                         <ChevronRight className="w-5 h-5 text-blue-500" />
-                        {step.step}
+                        {step.step || step.data?.label || "Untitled Step"}
                     </h3>
 
                     {/* Description */}
-                    {step.description && (
+                    {(step.description || step.data?.description) && (
                         <p className="text-gray-600 dark:text-gray-300 mb-3 leading-relaxed">
-                            {step.description}
+                            {step.description || step.data?.description}
                         </p>
                     )}
 
@@ -25,7 +25,7 @@ export default function WorkflowCard({ step, runAutomation }) {
                     <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                         <div className="flex items-center gap-1">
                             <User className="w-4 h-4" />
-                            <span className="font-medium">{step.owner}</span>
+                            <span className="font-medium">{step.owner || step.data?.actor || "Unknown"}</span>
                         </div>
 
                         {step.timestamp && (
@@ -39,7 +39,7 @@ export default function WorkflowCard({ step, runAutomation }) {
 
                 {/* Action button */}
                 <button
-                    onClick={() => runAutomation(step.id)}
+                    onClick={() => runAutomation(step)}
                     className="ml-4 flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
                 >
                     <Play className="w-4 h-4" />

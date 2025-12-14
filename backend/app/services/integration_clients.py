@@ -380,3 +380,55 @@ def import_csv_events(file_path: str, team_id: str) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"CSV Import Error: {e}")
         return []
+
+# --- WRITING (AUTOMATION) ---
+
+def send_slack_message(token: str, channel: str, text: str) -> Dict[str, Any]:
+    """Send a message to a Slack channel"""
+    if not token or not channel:
+        return {"success": False, "error": "Missing token or channel"}
+        
+    try:
+        client = WebClient(token=token)
+        # Handle channel name vs ID if needed, but chat_postMessage handles usage of name usually?
+        # Ideally using an ID is safer.
+        response = client.chat_postMessage(channel=channel, text=text)
+        return {"success": True, "ts": response["ts"]}
+    except SlackApiError as e:
+        print(f"Slack Send Error: {e.response['error']}")
+        return {"success": False, "error": str(e.response['error'])}
+
+def create_jira_issue(api_key: str, project_key: str, summary: str, description: str, issue_type: str = "Task") -> Dict[str, Any]:
+    """Create a Jira ticket"""
+    jira_server = os.getenv("JIRA_SERVER", "https://your-domain.atlassian.net")
+    jira_email = os.getenv("JIRA_EMAIL", "")
+
+    # Resolve token/auth
+    if api_key == "env": api_key = os.getenv("JIRA_API_TOKEN", "")
+    
+    if not api_key:
+         return {"success": False, "error": "Missing Jira API Token"}
+    if not project_key:
+         return {"success": False, "error": "Missing Project Key"}
+
+    try:
+        if jira_email and "@" in jira_email:
+             jira = JIRA(server=jira_server, basic_auth=(jira_email, api_key))
+        else:
+             jira = JIRA(server=jira_server, token_auth=api_key)
+        
+        issue_dict = {
+            'project': {'key': project_key},
+            'summary': summary,
+            'description': description,
+            'issuetype': {'name': issue_type},
+        }
+        new_issue = jira.create_issue(fields=issue_dict)
+        return {
+            "success": True, 
+            "key": new_issue.key, 
+            "url": f"{jira_server}/browse/{new_issue.key}"
+        }
+    except Exception as e:
+        print(f"Jira Create Error: {e}")
+        return {"success": False, "error": str(e)}

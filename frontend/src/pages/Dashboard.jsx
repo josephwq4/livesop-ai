@@ -76,13 +76,40 @@ export default function Dashboard() {
         }
     };
 
-    const handleRunAutomation = async (workflowId) => {
+    const handleRunAutomation = async (step) => {
         try {
-            const result = await runAutomation(teamId, workflowId);
+            const label = (step.step || step.data?.label || "").toLowerCase();
+            const desc = (step.description || step.data?.description || "");
+
+            // Default Action: Slack Notification
+            let payload = {
+                action: 'slack_notify',
+                params: {
+                    message: `[Automation] Executed step: ${step.step || step.data?.label}`
+                }
+            };
+
+            // Smart Heuristic: Detect Jira Intent
+            if (label.includes('jira') || label.includes('ticket') || label.includes('issue')) {
+                payload = {
+                    action: 'create_jira_ticket',
+                    params: {
+                        summary: step.step || step.data?.label,
+                        description: desc || "Created via LiveSOP Automation"
+                    }
+                };
+            }
+
+            const result = await runAutomation(teamId, payload);
+
             if (result.success) {
-                showNotification(`Automation executed successfully!`, 'success');
+                showNotification(result.message, 'success');
+                if (result.url) {
+                    // Allow user to see the link (console for now, notification supported via message)
+                    console.log("Created resource:", result.url);
+                }
             } else {
-                showNotification('Automation failed', 'error');
+                showNotification(`Automation failed: ${result.message}`, 'error');
             }
         } catch (error) {
             console.error('Error running automation:', error);

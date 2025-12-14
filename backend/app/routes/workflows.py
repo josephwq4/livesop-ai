@@ -8,13 +8,31 @@ router = APIRouter(tags=["workflows"])
 
 
 @router.get("/{team_id}/workflows")
-def get_workflows(team_id: str):
-    """Get inferred workflows for a team"""
+
+def get_workflows(team_id: str, current_user: dict = Depends(get_current_user)):
+    """Get active inferred workflow for the authenticated user's team"""
     try:
-        workflow_graph = infer_workflow(team_id)
+        from app.repositories.persistence import PersistenceRepository
+        repo = PersistenceRepository()
+        
+        # Resolve Team from User (Single Tenant MVP)
+        user_id = current_user.get("sub")
+        real_team_id = repo.get_or_create_team(f"Team {user_id[:4]}", user_id)
+        
+        workflow_graph = repo.get_active_workflow(real_team_id)
+        
+        # If no persistent workflow, return empty structure (Frontend handles "No Workflows Yet")
+        if not workflow_graph:
+            return {
+                "success": True,
+                "team_id": real_team_id,
+                "workflow": None,
+                "message": "No active workflow found"
+            }
+            
         return {
             "success": True,
-            "team_id": team_id,
+            "team_id": real_team_id,
             "workflow": workflow_graph
         }
     except Exception as e:

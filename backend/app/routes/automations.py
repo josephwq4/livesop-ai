@@ -1,53 +1,65 @@
-from fastapi import APIRouter, HTTPException
-from app.services.automation_runner import automation_runner
-from app.models.workflow import AutomationRequest
-from typing import Optional, Dict, Any
+from fastapi import APIRouter, HTTPException, Depends, Body
+from typing import Dict, Any
+from app.dependencies.auth import get_current_user
+from app.services.integration_clients import send_slack_message, create_jira_issue
+import os
 
 router = APIRouter(tags=["automations"])
 
+@router.post("/{team_id}/execute")
+def execute_automation(
+    team_id: str, 
+    payload: Dict[str, Any] = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Execute an automated action (Slack, Jira, etc.)
+    Payload: { "action": "type", "params": {...} }
+    """
+    action_type = payload.get("action")
+    params = payload.get("params", {})
+    
+    if not action_type:
+        raise HTTPException(status_code=400, detail="Missing 'action' in payload")
 
-@router.post("/{team_id}/run/{workflow_id}")
-def execute_automation(team_id: str, workflow_id: str, parameters: Optional[Dict[str, Any]] = None):
-    """Execute a workflow automation"""
+    print(f"[Automation] Executing {action_type} for team {team_id} by user {current_user.get('sub')}")
+
+    result = {"success": False, "message": "Unknown action"}
+
     try:
-        result = automation_runner.run_automation(team_id, workflow_id, parameters)
+        if action_type == "create_jira_ticket":
+            # Defaults
+            project = params.get("project") or os.getenv("JIRA_PROJECT", "PROJ")
+            summary = params.get("summary", "New Task from LiveSOP")
+            desc = params.get("description", "Created via LiveSOP Automation")
+            
+            # Execute
+            res = create_jira_issue("env", project, summary, desc)
+            if res["success"]:
+                result = {
+                    "success": True, 
+                    "message": f"Created Jira Ticket {res['key']}",
+                    "url": res["url"]
+                }
+            else:
+                raise Exception(res.get("error", "Unknown Jira Error"))
+
+        elif action_type == "slack_notify":
+            channel = params.get("channel") or os.getenv("SLACK_CHANNELS", "general").split(",")[0]
+            text = params.get("message", "Hello from LiveSOP")
+            token = os.getenv("SLACK_TOKEN", "")
+            
+            res = send_slack_message(token, channel, text)
+            if res["success"]:
+                result = {"success": True, "message": "Slack message sent"}
+            else:
+                raise Exception(res.get("error", "Unknown Slack Error"))
+
+        else:
+             raise HTTPException(status_code=400, detail=f"Unsupported action: {action_type}")
+
         return result
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error executing automation: {str(e)}")
-
-
-@router.get("/{team_id}/history")
-def get_automation_history(team_id: str, limit: int = 50):
-    """Get automation execution history for a team"""
-    try:
-        history = automation_runner.get_automation_history(team_id, limit)
-        return {
-            "success": True,
-            "team_id": team_id,
-            "count": len(history),
-            "history": history
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching history: {str(e)}")
-
-
-@router.post("/{team_id}/schedule/{workflow_id}")
-def schedule_automation(team_id: str, workflow_id: str, schedule: str, parameters: Optional[Dict[str, Any]] = None):
-    """Schedule a recurring automation"""
-    try:
-        result = automation_runner.schedule_automation(team_id, workflow_id, schedule, parameters)
-        return {
-            "success": True,
-            "scheduled_automation": result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error scheduling automation: {str(e)}")
-
-
-@router.get("/test")
-def test_automations():
-    """Test endpoint to verify automations API is working"""
-    return {
-        "status": "ok",
-        "message": "Automations API is running"
-    }
+        print(f"[Automation Error] {e}")
+        raise HTTPException(status_code=500, detail=str(e))

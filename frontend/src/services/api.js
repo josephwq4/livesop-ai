@@ -48,8 +48,8 @@ export const searchWorkflows = async (teamId, query, limit = 10) => {
 };
 
 // Automations API
-export const runAutomation = async (teamId, workflowId, parameters = null) => {
-  const response = await api.post(`/automations/${teamId}/run/${workflowId}`, parameters);
+export const runAutomation = async (teamId, payload) => {
+  const response = await api.post(`/automations/${teamId}/execute`, payload);
   return response.data;
 };
 

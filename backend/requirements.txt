@@ -17,3 +17,5 @@ numpy
 pandas
 pyjwt
 slowapi
+
+supabase

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.services.workflow_inference import infer_workflow, generate_sop_document, query_similar_events
 from app.models.workflow import WorkflowGraph
 from typing import Optional
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(tags=["workflows"])
 
@@ -21,10 +22,11 @@ def get_workflows(team_id: str):
 
 
 @router.post("/{team_id}/infer")
-def run_inference(team_id: str):
+def run_inference(team_id: str, current_user: dict = Depends(get_current_user)):
     """Run workflow inference for a team"""
     try:
-        workflow_graph = infer_workflow(team_id)
+        # Pass user_id (sub) to infer_workflow to enable persistence team resolution
+        workflow_graph = infer_workflow(team_id, user_id=current_user.get("sub"))
         return {
             "success": True,
             "team_id": team_id,

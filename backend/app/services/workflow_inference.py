@@ -222,34 +222,84 @@ Return ONLY the JSON, no additional text."""
         return generate_workflow_graph_with_llm([])
 
 
-def infer_workflow(team_id: str) -> Dict[str, Any]:
-    """Main function to infer workflow from team activities"""
-    # Fetch all events from integrations
-    events = fetch_all_events(team_id)
+from app.repositories.persistence import PersistenceRepository
+
+def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:
+    """
+    Main function to infer workflow from team activities with Full Persistence.
+    
+    args:
+        team_id (str): The logical team ID (or 'default').
+        user_id (str): The Authed User ID (Required for DB Team resolution).
+    """
+    # 1. Initialize Repo
+    repo = PersistenceRepository()
+    
+    # 2. Resolve Real DB Team ID
+    # If we have a user_id, we ensure they have a team in the DB.
+    # If not, we fallback to the passed team_id (assuming it's a UUID for now, or failing).
+    real_team_id = team_id
+    if user_id:
+        # Create/Get team owned by this user
+        real_team_id = repo.get_or_create_team(f"Team {user_id[:4]}", user_id)
+    
+    print(f"[Inference] Object resolved to Team UUID: {real_team_id}")
+
+    # 3. Fetch Events (Integration Layer)
+    # Note: fetch_all_events currently uses env vars. It doesn't use DB stored creds yet.
+    # In Phase 2, we will load credentials from DB. For now, it works for the single configured user.
+    events = fetch_all_events(team_id) # API Clients work on env vars
     
     if not events:
         return {
-            "team_id": team_id,
-            "workflow_id": f"wf_{team_id}_{datetime.now().timestamp()}",
+            "team_id": real_team_id,
+            "workflow_id": None,
             "nodes": [],
             "edges": [],
-            "message": "No events found. Please connect integrations or import data."
+            "message": "No events found. Please connect integrations."
         }
-    
-    # Store events in vector DB
-    store_events_in_vector_db(team_id, events)
-    
-    # Generate workflow graph using LLM
-    workflow_graph = generate_workflow_graph_with_llm(events)
-    
-    # Add metadata
-    workflow_graph["team_id"] = team_id
-    workflow_graph["workflow_id"] = f"wf_{team_id}_{int(datetime.now().timestamp())}"
-    workflow_graph["created_at"] = datetime.now().isoformat()
-    workflow_graph["updated_at"] = datetime.now().isoformat()
-    workflow_graph["event_count"] = len(events)
-    
-    return workflow_graph
+        
+    try:
+        # 4. Ingest Raw Signals (Persist the Data Lake)
+        # Map events to repo format (lists of dicts)
+        # Our fetch_all_events format aligns with repo.ingest_signals expectation.
+        signal_ids = repo.ingest_signals(real_team_id, events)
+        print(f"[Persistence] Ingested {len(signal_ids)} signals.")
+        
+        # 5. Create Inference Run (Audit Log)
+        run_id = repo.create_inference_run(real_team_id, "manual_dashboard", {"model": "gpt-4", "event_count": len(events)})
+        print(f"[Persistence] Started Run: {run_id}")
+        
+        # 6. Link Signals to Run (Provenance)
+        repo.link_signals_to_run(run_id, signal_ids)
+        
+        # Vector Store (Phase 2 - Disabled/Optional)
+        # store_events_in_vector_db(real_team_id, events)
+        
+        # 7. Generate Workflow Graph (LLM)
+        workflow_graph = generate_workflow_graph_with_llm(events)
+        
+        # 8. Save Workflow (Commit Artifact)
+        persisted_wf_id = repo.save_workflow(real_team_id, run_id, workflow_graph)
+        print(f"[Persistence] Saved Workflow {persisted_wf_id}")
+        
+        # 9. Complete Run
+        repo.complete_inference_run(run_id, "success")
+        
+        # 10. Return Result (Enriched with DB ID)
+        workflow_graph["team_id"] = real_team_id
+        workflow_graph["workflow_id"] = persisted_wf_id
+        workflow_graph["created_at"] = datetime.now().isoformat()
+        
+        return workflow_graph
+
+    except Exception as e:
+        print(f"[CRITICAL] Inference/Persistence Failed: {e}")
+        # Phase 1: We just log raw error to console.
+        # In future, update run status to 'failed'
+        if 'run_id' in locals():
+            repo.complete_inference_run(run_id, "failed")
+        raise e
 
 
 def generate_sop_document(team_id: str, workflow_id: str) -> str:

@@ -175,7 +175,8 @@ export default function Dashboard() {
             }
         } catch (error) {
             console.error('Error running automation:', error);
-            showNotification('Error running automation', 'error');
+            const msg = error.response?.data?.detail || error.message || 'Error running automation';
+            showNotification(`Failed: ${msg}`, 'error');
         }
     };
 

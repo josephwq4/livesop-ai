@@ -23,6 +23,17 @@ export default function Settings() {
 
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">Settings</h1>
 
+                {/* Workspace Info */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Workspace</h2>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-700">
+                        <label className="block text-sm font-medium text-gray-500 mb-1">Current Workspace</label>
+                        <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            LiveSOP Team <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Primary</span>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Profile Section */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
                     <div className="flex items-center gap-4 mb-6">

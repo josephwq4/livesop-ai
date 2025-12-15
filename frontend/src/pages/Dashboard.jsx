@@ -14,8 +14,10 @@ import {
     Network,
     List,
     History,
+    History,
     Search,
-    X
+    X,
+    Shield
 } from 'lucide-react';
 
 import Navbar from '../components/Navbar';
@@ -264,7 +266,7 @@ export default function Dashboard() {
                         ) : (
                             <Sparkles className="w-5 h-5" />
                         )}
-                        {inferring ? 'Inferring...' : 'Run Inference'}
+                        {inferring ? 'Analyzing...' : 'Analyze Signals'}
                     </button>
 
                     <button
@@ -322,11 +324,17 @@ export default function Dashboard() {
                             <Workflow className="w-12 h-12 text-blue-600 dark:text-blue-400" />
                         </div>
                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-                            No Workflows Yet
+                            No Automations Configured
                         </h2>
                         <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                            Connect your integrations or import data, then run inference to generate AI-powered workflows.
+                            LiveSOP is monitoring your integration signals. Once a resolution pattern is detected, it will appear here for your review.
                         </p>
+
+                        <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-8 bg-gray-50 dark:bg-gray-900/50 py-2 px-4 rounded-full w-fit mx-auto">
+                            <Shield className="w-4 h-4 ml-1" />
+                            <span>You are in control. Automations require approval unless Auto-Pilot is enabled.</span>
+                        </div>
+
                         <button
                             onClick={handleRunInference}
                             disabled={inferring}
@@ -337,7 +345,7 @@ export default function Dashboard() {
                             ) : (
                                 <Sparkles className="w-5 h-5" />
                             )}
-                            {inferring ? 'Generating...' : 'Generate Workflow'}
+                            {inferring ? 'Processing...' : 'Create Workflow'}
                         </button>
                     </div>
                 ) : (
@@ -446,7 +454,7 @@ export default function Dashboard() {
                         <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
                             <h2 className="text-xl font-bold flex items-center gap-2 dark:text-white">
                                 <Search className="w-5 h-5 text-blue-600" />
-                                Smart Context
+                                Smart Knowledge Base
                             </h2>
                             <button onClick={() => setShowSearch(false)}><X className="w-5 h-5 dark:text-gray-400" /></button>
                         </div>
@@ -456,7 +464,7 @@ export default function Dashboard() {
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Ask about past incidents, logic, or decisions..."
+                                    placeholder="Search past resolutions or context..."
                                     className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                                 <button
@@ -464,7 +472,7 @@ export default function Dashboard() {
                                     disabled={isSearching}
                                     className="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
                                 >
-                                    {isSearching ? <Loader2 className="animate-spin" /> : 'Ask AI'}
+                                    {isSearching ? <Loader2 className="animate-spin" /> : 'Search'}
                                 </button>
                             </form>
 

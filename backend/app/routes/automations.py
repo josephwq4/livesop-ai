@@ -112,7 +112,13 @@ def get_live_feed(
                 "customer": primary_signal.get("actor", "Unknown"),
                 "confidence": r.get("model_config", {}).get("confidence", 0.0), # Default 0
                 "action": r["trigger_type"],
-                "status": r["status"]
+                "status": r["status"],
+                
+                # Trust Panel Data
+                "content": primary_signal.get("content", ""),
+                "channel_id": primary_signal.get("metadata", {}).get("channel_id", ""),
+                "link": primary_signal.get("metadata", {}).get("permalink", ""),
+                "rationale": r.get("model_config", {}).get("reasoning", "Matched Tier-3 Escalation criteria based on keywords.")
             })
             
         return {"feed": feed}

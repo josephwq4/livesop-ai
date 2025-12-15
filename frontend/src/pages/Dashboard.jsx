@@ -27,6 +27,7 @@ import {
 import { getLiveFeed, getTeamUsage } from '../services/api';
 
 import Navbar from '../components/Navbar';
+import TrustPanel from '../components/TrustPanel';
 
 export default function Dashboard() {
     const [workflow, setWorkflow] = useState(null);
@@ -41,6 +42,7 @@ export default function Dashboard() {
     // Live Feed & Usage
     const [feed, setFeed] = useState([]);
     const [usage, setUsage] = useState(null);
+    const [selectedEscalation, setSelectedEscalation] = useState(null);
 
     // Search State
     const [showSearch, setShowSearch] = useState(false);
@@ -51,6 +53,13 @@ export default function Dashboard() {
     const [realTeamId, setRealTeamId] = useState(null);
 
     const teamId = 'team123'; // Placeholder for API calls until AuthContext provides it
+
+    const handleTrustAction = (action) => {
+        if (action === 'toggle_autopilot') {
+            showNotification("Auto-Pilot preferences updated for this pattern.", "success");
+            // In a real app, call API to update pattern config
+        }
+    };
 
     useEffect(() => {
         loadWorkflows();
@@ -493,11 +502,15 @@ export default function Dashboard() {
                                                 </tr>
                                             ) : (
                                                 feed.map((item) => (
-                                                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                                    <tr
+                                                        key={item.id}
+                                                        onClick={() => setSelectedEscalation(item)}
+                                                        className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer group"
+                                                    >
                                                         <td className="px-6 py-4 text-sm text-gray-500">
                                                             {new Date(item.time).toLocaleTimeString()}
                                                         </td>
-                                                        <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                                                        <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors">
                                                             {item.channel}
                                                         </td>
                                                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
@@ -643,6 +656,14 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
+
+            {/* Trust Panel Modal */}
+            <TrustPanel
+                escalation={selectedEscalation}
+                onClose={() => setSelectedEscalation(null)}
+                onAction={handleTrustAction}
+                autoPilot={false} // Default state, could be fetched
+            />
         </div>
     );
 }

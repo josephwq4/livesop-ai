@@ -16,8 +16,15 @@ import {
     History,
     Search,
     X,
-    Shield
+    Shield,
+    CheckCircle,
+    Activity,
+    Clock,
+    AlertTriangle,
+    Zap,
+    MoreHorizontal
 } from 'lucide-react';
+import { getLiveFeed, getTeamUsage } from '../services/api';
 
 import Navbar from '../components/Navbar';
 
@@ -30,6 +37,10 @@ export default function Dashboard() {
     const [notification, setNotification] = useState(null);
     const [history, setHistory] = useState([]);
     const [showHistory, setShowHistory] = useState(false);
+
+    // Live Feed & Usage
+    const [feed, setFeed] = useState([]);
+    const [usage, setUsage] = useState(null);
 
     // Search State
     const [showSearch, setShowSearch] = useState(false);
@@ -44,7 +55,21 @@ export default function Dashboard() {
     useEffect(() => {
         loadWorkflows();
         loadHistory();
+        loadDashboardData();
     }, []);
+
+    const loadDashboardData = async () => {
+        try {
+            const [feedData, usageData] = await Promise.all([
+                getLiveFeed(teamId),
+                getTeamUsage()
+            ]);
+            if (feedData.feed) setFeed(feedData.feed);
+            if (usageData.usage) setUsage(usageData.usage);
+        } catch (e) {
+            console.error("Dashboard Data Error:", e);
+        }
+    };
 
     // Real-time Subscription
     useEffect(() => {
@@ -280,6 +305,40 @@ export default function Dashboard() {
 
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-6 py-8">
+                {/* Hero Stats */}
+                <div className="grid md:grid-cols-3 gap-6 mb-8">
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-2xl border border-amber-100 dark:border-amber-800 flex items-center gap-4">
+                        <div className="p-3 bg-amber-100 dark:bg-amber-800 rounded-xl text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Escalations Detected</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{feed.length}</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-300">This Week</p>
+                        </div>
+                    </div>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border border-blue-100 dark:border-blue-800 flex items-center gap-4">
+                        <div className="p-3 bg-blue-100 dark:bg-blue-800 rounded-xl text-blue-600 dark:text-blue-400">
+                            <Zap className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Auto-Resolutions</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{usage?.automation_count || 0}</p>
+                            <p className="text-xs text-blue-700 dark:text-blue-300">Run automatically</p>
+                        </div>
+                    </div>
+                    <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-2xl border border-green-100 dark:border-green-800 flex items-center gap-4">
+                        <div className="p-3 bg-green-100 dark:bg-green-800 rounded-xl text-green-600 dark:text-green-400">
+                            <Clock className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-green-800 dark:text-green-200">Hours Saved</p>
+                            <p className="text-2xl font-bold text-gray-900 dark:text-white">~{((usage?.automation_count || 0) * 0.25).toFixed(1)}h</p>
+                            <p className="text-xs text-green-700 dark:text-green-300">Est. 15min / task</p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* View Toggle */}
                 <div className="flex items-center gap-2 mb-6 bg-white dark:bg-gray-800 p-2 rounded-xl shadow-md w-fit">
                     <button
@@ -291,6 +350,17 @@ export default function Dashboard() {
                     >
                         <List className="w-5 h-5" />
                         Cards
+                    </button>
+
+                    <button
+                        onClick={() => setView('live')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${view === 'live'
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
+                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                    >
+                        <Activity className="w-5 h-5" />
+                        Live Feed
                     </button>
 
                     <button
@@ -391,6 +461,84 @@ export default function Dashboard() {
                                         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {view === 'live' && (
+                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="p-6 border-b border-gray-100 dark:border-gray-700">
+                                    <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <Activity className="w-5 h-5 text-amber-500" />
+                                        Live Escalation Feed
+                                    </h2>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 text-xs uppercase font-semibold">
+                                            <tr>
+                                                <th className="px-6 py-4">Time</th>
+                                                <th className="px-6 py-4">Channel</th>
+                                                <th className="px-6 py-4">Customer</th>
+                                                <th className="px-6 py-4">Confidence</th>
+                                                <th className="px-6 py-4">Action</th>
+                                                <th className="px-6 py-4 text-right">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                            {feed.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                                        No recent escalations detected.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                feed.map((item) => (
+                                                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                                        <td className="px-6 py-4 text-sm text-gray-500">
+                                                            {new Date(item.time).toLocaleTimeString()}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                                                            {item.channel}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                                                                    {item.customer.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                {item.customer}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex-1 h-2 bg-gray-100 rounded-full w-20 overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full rounded-full ${item.confidence > 0.8 ? 'bg-green-500' : 'bg-amber-500'}`}
+                                                                        style={{ width: `${item.confidence * 100}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                                <span className="text-xs font-bold text-gray-600 dark:text-gray-400">
+                                                                    {(item.confidence * 100).toFixed(0)}%
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm">
+                                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-medium border border-blue-100">
+                                                                {item.action}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${item.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                                                                }`}>
+                                                                {item.status === 'completed' ? <CheckCircle className="w-3 h-3" /> : <Loader2 className="w-3 h-3 animate-spin" />}
+                                                                {item.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         )}
                     </>

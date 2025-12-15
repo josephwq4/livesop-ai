@@ -6,6 +6,7 @@ import Integrations from './pages/Integrations';
 import PrivateRoute from './components/PrivateRoute';
 import Landing from './pages/Landing';
 import Settings from './pages/Settings';
+import Onboarding from './pages/Onboarding';
 import './index.css';
 
 function App() {
@@ -36,6 +37,14 @@ function App() {
                     element={
                         <PrivateRoute>
                             <Integrations />
+                        </PrivateRoute>
+                    }
+                />
+                <Route
+                    path="/onboarding"
+                    element={
+                        <PrivateRoute>
+                            <Onboarding />
                         </PrivateRoute>
                     }
                 />

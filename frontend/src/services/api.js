@@ -120,4 +120,14 @@ export const uploadCSV = async (teamId, file) => {
   return response.data;
 };
 
+export const getTeamUsage = async () => {
+  const response = await api.get('/usage/');
+  return response.data;
+};
+
+export const getLiveFeed = async (teamId) => {
+  const response = await api.get(`/automations/${teamId}/live_feed`);
+  return response.data;
+};
+
 export default api;

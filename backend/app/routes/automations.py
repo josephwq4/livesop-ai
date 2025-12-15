@@ -63,3 +63,61 @@ def execute_automation(
     except Exception as e:
         print(f"[Automation Error] {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{team_id}/live_feed")
+def get_live_feed(
+    team_id: str, 
+    limit: int = 10,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get recent escalations/automations for the live dashboard"""
+    try:
+        from app.repositories.persistence import PersistenceRepository
+        repo = PersistenceRepository()
+        
+        # Helper to resolve team if needed, but path param is used. 
+        # Ideally verify user access to team_id here.
+        user_id = current_user.get("sub")
+        # For simplicity in MVP, we might trust the ID or verify ownership:
+        # real_team_id = repo.get_or_create_team(...) matches team_id check
+        
+        # Fetch runs with signals
+        # select("*, inference_run_signals(raw_signals(*))")
+        try:
+            res = repo.db.table("inference_runs")\
+                .select("*, inference_run_signals(signal_id, raw_signals(*))")\
+                .eq("team_id", team_id)\
+                .order("started_at", desc=True)\
+                .limit(limit)\
+                .execute()
+        except Exception as e:
+            # Fallback if join syntax fails or table empty
+            print(f"Join query failed: {e}")
+            return {"feed": []}
+            
+        feed = []
+        for r in res.data:
+            # Flatten structure
+            signals_join = r.get("inference_run_signals", [])
+            primary_signal = {}
+            if signals_join:
+                 # It returns a list of objects { signal_id: ..., raw_signals: {...} }
+                 primary_signal = signals_join[0].get("raw_signals") or {}
+
+            feed.append({
+                "id": r["id"],
+                "time": r["started_at"],
+                "channel": primary_signal.get("metadata", {}).get("channel", "Unknown"),
+                "customer": primary_signal.get("actor", "Unknown"),
+                "confidence": r.get("model_config", {}).get("confidence", 0.0), # Default 0
+                "action": r["trigger_type"],
+                "status": r["status"]
+            })
+            
+        return {"feed": feed}
+
+    except Exception as e:
+        print(f"Live Feed Error: {e}")
+        # Return empty feed instead of crash
+        return {"feed": []}

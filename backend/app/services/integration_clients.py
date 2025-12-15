@@ -403,11 +403,12 @@ def send_slack_message(token: str, channel: str, text: str) -> Dict[str, Any]:
 
 def create_jira_issue(api_key: str, project_key: str, summary: str, description: str, issue_type: str = "Task") -> Dict[str, Any]:
     """Create a Jira ticket"""
-    jira_server = os.getenv("JIRA_SERVER", "https://your-domain.atlassian.net")
+    jira_server = os.getenv("JIRA_URL") or os.getenv("JIRA_SERVER", "https://your-domain.atlassian.net")
     jira_email = os.getenv("JIRA_EMAIL", "")
 
     # Resolve token/auth
-    if api_key == "env": api_key = os.getenv("JIRA_API_TOKEN", "")
+    if api_key == "env": 
+        api_key = os.getenv("JIRA_API_KEY") or os.getenv("JIRA_API_TOKEN", "")
     
     if not api_key:
          return {"success": False, "error": "Missing Jira API Token"}

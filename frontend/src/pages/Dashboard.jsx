@@ -205,6 +205,8 @@ export default function Dashboard() {
                     // Allow user to see the link (console for now, notification supported via message)
                     console.log("Created resource:", result.url);
                 }
+                // Refresh Live Feed & Usage to show the new event immediately
+                await loadDashboardData();
             } else {
                 showNotification(`Automation failed: ${result.message}`, 'error');
             }

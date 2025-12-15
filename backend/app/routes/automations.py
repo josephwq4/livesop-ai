@@ -63,28 +63,6 @@ def execute_automation(
             from app.repositories.persistence import PersistenceRepository
             repo = PersistenceRepository()
             
-            # Resolve team (redundant if passed correctly, but safe)
-            # For this MVP, we assume team_id is valid or we accept it. 
-            # Ideally verify user is part of team_id.
-            
-            # Create a "run" entry for this automation so it appears in Live Feed
-            run_data = {
-                "team_id": team_id,
-                "trigger_type": action_type, # e.g. "create_jira_ticket"
-                "status": "completed" if result["success"] else "failed",
-                "model_config": {
-                    "confidence": 1.0, # Explicit user action = 100% confidence
-                    "reasoning": f"Manual trigger by user {current_user.get('email', 'unknown')}",
-                    "params": params
-                },
-                "started_at": os.popen("date -u +%Y-%m-%dT%H:%M:%SZ").read().strip() or str(datetime.now(timezone.utc))
-            }
-            # Use raw sql or repository method. 
-            # repo.create_inference_run expects slightly different args, let's just insert directly or reuse.
-            # actually create_inference_run is perfect if we tweak it or use it as is.
-            
-            # Re-using create_inference_run but we need to mark it completed immediately
-            # We can just manually insert to be precise with fields
             from datetime import datetime, timezone
             
             db_entry = {
@@ -114,10 +92,69 @@ def execute_automation(
             # Don't fail the request if logging fails, but log error
 
         return result
-
+    
     except Exception as e:
         print(f"[Automation Error] {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/replay/{signal_id}")
+def replay_signal(
+    signal_id: str, 
+    dry_run: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Internal/Admin: Deterministic Replay of a past signal through the Auto-Pilot Engine.
+    Useful for testing, debugging, or dry-running logic changes.
+    """
+    try:
+        from app.repositories.persistence import PersistenceRepository
+        from app.services.trigger_engine import evaluate_signal
+        
+        repo = PersistenceRepository()
+        
+        # 1. Fetch Signal
+        signal = repo.get_signal_by_id(signal_id)
+        if not signal:
+             raise HTTPException(status_code=404, detail="Signal not found")
+             
+        team_id = signal["team_id"]
+        
+        # 2. Re-Run Evaluation
+        # We pass dry_run=True usually for testing. 
+        # But if user explicitly wants to re-execute, they can pass dry_run=False.
+        
+        print(f"[Replay] Replaying signal {signal_id} for team {team_id} (DryRun={dry_run})")
+        
+        # Note: evaluate_signal builds its own idempotency key.
+        # If dry_run=False, it might accidentally skip if the key matches a previous real run.
+        # However, evaluate_signal's idempotency check is skipped if dry_run=True.
+        # If user attempts a FORCE REPLAY (dry_run=False) of an already executed event, 
+        # our logic currently blocks it unless we added a 'force' flag.
+        # For now, let's assume 'dry_run=True' is the primary use case for checking logic.
+        # If dry_run=False (Force Execute), the hash might collide.
+        # Let's trust the logic: if it ran before, we shouldn't run it again automatically.
+        # But this is an explicit manual trigger.
+        
+        # Let's assume manual replay should bypass idempotency check logic inside evaluate_signal?
+        # Actually evaluate_signal logic: if not dry_run => check idempotency.
+        # So Real Replay will fail if done before.
+        # This is SAFE. Idempotency is strict.
+        # To force re-run, one would need to delete the old run or change the signal slightly.
+        # OR we modify evaluate_signal to accept 'ignore_idempotency' arg. 
+        # For Phase A, strict idempotency is desired.
+        
+        evaluate_signal(team_id, signal, dry_run=dry_run)
+        
+        return {
+            "success": True,
+            "message": f"Replay triggered for {signal_id}",
+            "mode": "dry_run" if dry_run else "live_execution"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Replay failed: {str(e)}")
 
 
 @router.get("/{team_id}/live_feed")

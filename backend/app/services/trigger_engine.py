@@ -65,14 +65,30 @@ def _match_signal_to_nodes(signal_text: str, nodes: list) -> Tuple[Dict, float, 
         print(f"[Trigger AI Error] {e}")
         return None, 0.0, f"AI Error: {str(e)}"
 
-def evaluate_signal(team_id: str, signal: Dict[str, Any]):
+import hashlib
+
+def evaluate_signal(team_id: str, signal: Dict[str, Any], dry_run: bool = False):
     """
     Phase 9 Hardening: Intelligent, Confidence-Gated Auto-Pilot Execution.
+    Supports dry_run and idempotency.
     """
     repo = PersistenceRepository()
     
     try:
-        print(f"[Trigger] Evaluating signal for team {team_id}: {signal.get('text', '')[:30]}...")
+        signal_text = signal.get("text", "")
+        # 0. Idempotency Check
+        # Hash: team_id + source + external_id (if available) or text + timestamp
+        
+        raw_key = f"{team_id}:{signal.get('source')}:{signal.get('id')}:{signal_text}"
+        idempotency_key = hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+        
+        # If it's a dry run, we ignore idempotency (allow replay)
+        if not dry_run:
+             if repo.check_idempotency_key(team_id, idempotency_key):
+                 print(f"[Trigger] Duplicate event detected. Skipping. Key: {idempotency_key[:8]}")
+                 return 
+        
+        print(f"[Trigger] Evaluating signal for team {team_id} (DryRun={dry_run}): {signal_text[:30]}...")
         
         # 1. Fetch Workflow
         workflow = repo.get_active_workflow(team_id)
@@ -82,7 +98,7 @@ def evaluate_signal(team_id: str, signal: Dict[str, Any]):
 
         # 2. Intelligent Match
         matched_node, confidence, reasoning = _match_signal_to_nodes(
-            signal.get("text", ""), 
+            signal_text, 
             workflow["nodes"]
         )
         
@@ -97,39 +113,50 @@ def evaluate_signal(team_id: str, signal: Dict[str, Any]):
             status = "rejected_low_confidence"
             
         # 4. Audit Log (START)
-        # We record the "attempt" or decision even if rejected, providing visibility.
         run_entry = {
             "team_id": team_id,
-            "trigger_type": "auto_pilot_evaluation",  # Distinguish from manual
+            "trigger_type": "auto_pilot_evaluation", 
             "status": "processing",
             "model_config": {
                 "matched_node": matched_node.get("data", {}).get("label") if matched_node else None,
                 "confidence": confidence,
                 "reasoning": reasoning,
                 "threshold": THRESHOLD,
-                "signal_text": signal.get("text", "") # critical context
+                "signal_text": signal_text,
+                "dry_run": dry_run,
+                "idempotency_key": idempotency_key
             },
             "started_at": datetime.now(timezone.utc).isoformat()
         }
         
-        # Only log significant events (matches or high-confidence rejections) 
-        # to avoid flooding DB with "0% match" on every message?
-        # Requirement: "Full Audit Trail". We log if there was *any* candidate consideration.
         if confidence > 0.1:
             res = repo.db.table("inference_runs").insert(run_entry).execute()
             run_id = res.data[0]["id"]
-            
-            # Link Signal
-            # We assume signal has an ID in raw_signals. But we just ingested it in webhooks.
-            # We need to look up signal ID or pass it. 
-            # Ideally webhooks/ingest returns the ID. 
-            # For now, we skip explicit link if we don't have the UUID handy, 
-            # but we persist the text in model_config so it's visible.
         else:
             return # Ignore noise
 
         # 5. Execution (If Passed)
         if should_execute:
+            # Recheck Dry Run
+            if dry_run:
+                # Log simulated success
+                repo.db.table("inference_runs").update({
+                    "status": "completed", # "completed" implies success for the *run* (which was a dry-run check)
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "model_config": {
+                         "matched_node": matched_node.get("data", {}).get("label"),
+                         "confidence": confidence,
+                         "reasoning": reasoning,
+                         "threshold": THRESHOLD,
+                         "signal_text": signal_text,
+                         "dry_run": True,
+                         "idempotency_key": idempotency_key,
+                         "execution_result": {"success": True, "message": "Dry Run: Logic Validated.", "simulated": True}
+                    }
+                }).eq("id", run_id).execute()
+                print(f"[Auto-Pilot] Dry Run Passed. Action would be executed.")
+                return
+
             node_data = matched_node.get("data", {})
             label = node_data.get("label", "").lower()
             
@@ -137,12 +164,11 @@ def evaluate_signal(team_id: str, signal: Dict[str, Any]):
             action = "slack_notify"
             params = {"message": f"🤖 Auto-Pilot: Executed '{node_data.get('label')}' based on your workflow rules."}
             
-            # Heuristic for Action Type (Refine this later to be config-driven)
             if any(x in label for x in ["jira", "ticket", "issue"]):
                 action = "create_jira_ticket"
                 params = {
                     "summary": f"[Auto] {node_data.get('label')}",
-                    "description": f"Triggered by Signal: {signal.get('text')}\n\nReasoning: {reasoning}"
+                    "description": f"Triggered by Signal: {signal_text}\n\nReasoning: {reasoning}"
                 }
             
             # Execute Service
@@ -155,12 +181,13 @@ def evaluate_signal(team_id: str, signal: Dict[str, Any]):
                 "trigger_type": action, # Update to actual action taken
                 "completed_at": datetime.now(timezone.utc).isoformat(),
                 "model_config": {
-                     # Preserve previous context
                      "matched_node": matched_node.get("data", {}).get("label"),
                      "confidence": confidence,
                      "reasoning": reasoning,
                      "threshold": THRESHOLD,
-                     "signal_text": signal.get("text", ""),
+                     "signal_text": signal_text,
+                     "dry_run": False,
+                     "idempotency_key": idempotency_key,
                      "execution_result": result
                 }
             }).eq("id", run_id).execute()
@@ -171,7 +198,7 @@ def evaluate_signal(team_id: str, signal: Dict[str, Any]):
                  
         else:
             # Mark Low Confidence
-             repo.db.table("inference_runs").update({
+            repo.db.table("inference_runs").update({
                 "status": "skipped",
                 "completed_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", run_id).execute()

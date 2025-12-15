@@ -48,15 +48,53 @@ class PersistenceRepository:
                 "occurred_at": s.get("timestamp") or datetime.now(timezone.utc).isoformat()
             })
 
-        # Upsert to handle duplicates safely (on conflict do nothing usually, but Supabase insert doesn't support 'ignore' easily without RPC)
-        # We used UNIQUE constraint in SQL.
-        # upsert=True will update them. Ideally we simply want to ignore.
+        # Upsert to handle duplicates safely
         try:
+            # We use upsert. If we want to detect strictly if it's new, we'd need 'ignoreDuplicates' or SQL insert.
+            # But the requirement calls for checking idempotency at the trigger level too.
+            # So upsert is fine for the data lake.
             res = self.db.table("raw_signals").upsert(prepared_rows, on_conflict="team_id,source,external_id").execute()
             return [row["id"] for row in res.data]
         except Exception as e:
             print(f"[DB Error] Ingest Signals: {e}")
             raise e
+
+    def get_signal_by_id(self, signal_id: str) -> Optional[Dict]:
+        """Fetch a specific signal by its UUID or external ID"""
+        try:
+            # Try by DB ID first
+            res = self.db.table("raw_signals").select("*").eq("id", signal_id).maybe_single().execute()
+            if not res.data:
+                # Try by external ID (imperfect if multiples, but fallback)
+                res = self.db.table("raw_signals").select("*").eq("external_id", signal_id).limit(1).execute()
+                if not res.data: return None
+                return res.data[0]
+            return res.data
+        except Exception as e:
+            print(f"[DB Error] Get Signal: {e}")
+            return None
+
+    def check_idempotency_key(self, team_id: str, idempotency_key: str) -> bool:
+        """
+        Checks if a specific idempotency key (hash) has already been processed for Auto-Pilot.
+        Returns True if duplicate exists.
+        """
+        try:
+            # We look for a successful or processing run with this key in metadata
+            # or we create a dedicated idempotency table.
+            # For simplicity, we query 'inference_runs' model_config->idempotency_key
+            # Note: JSON filtering in Supabase: model_config->>'idempotency_key'
+            
+            res = self.db.table("inference_runs").select("id")\
+                .eq("team_id", team_id)\
+                .eq("trigger_type", "auto_pilot_evaluation")\
+                .eq("model_config->>idempotency_key", idempotency_key)\
+                .limit(1).execute()
+                
+            return len(res.data) > 0
+        except Exception as e:
+            print(f"[DB Error] Idempotency Check: {e}")
+            return False
 
     def search_signals(self, team_id: str, vector: List[float], limit: int = 5, threshold: float = 0.7) -> List[Dict]:
         """

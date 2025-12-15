@@ -1,0 +1,10 @@
+timestamp,user,text,channel
+2025-12-14T10:00:00,Customer_Alice,"Hi support, I am facing a critical issue with the payment gateway. Error code 500.",#support-tier3
+2025-12-14T10:05:00,Support_Bob,"Hi Alice, looking into this immediately. Can you share the transaction ID?",#support-tier3
+2025-12-14T10:06:00,Customer_Alice,"Sure, it's TXN_12345.",#support-tier3
+2025-12-14T10:15:00,Support_Bob,"Confirmed it's a timeout on the bank side. I will escalate this to engineering.",#support-tier3
+2025-12-14T10:20:00,Support_Bob,"Escalating to Tier 3. Need a Jira ticket for tracking.",#support-tier3
+2025-12-14T11:00:00,Customer_Charlie,"I found a bug in the login page. The 'Forgot Password' link is broken.",#bugs
+2025-12-14T11:05:00,Support_Dave,"Thanks Charlie. Can you reproduce this on Chrome?",#bugs
+2025-12-14T11:10:00,Customer_Charlie,"Yes, Chrome v120.",#bugs
+2025-12-14T11:15:00,Support_Dave,"Acknowledged. Creating a bug report.",#bugs

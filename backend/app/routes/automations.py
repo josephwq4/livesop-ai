@@ -57,6 +57,61 @@ def execute_automation(
 
         else:
              raise HTTPException(status_code=400, detail=f"Unsupported action: {action_type}")
+        
+        # --- LOG EXECUTION TO DB ---
+        try:
+            from app.repositories.persistence import PersistenceRepository
+            repo = PersistenceRepository()
+            
+            # Resolve team (redundant if passed correctly, but safe)
+            # For this MVP, we assume team_id is valid or we accept it. 
+            # Ideally verify user is part of team_id.
+            
+            # Create a "run" entry for this automation so it appears in Live Feed
+            run_data = {
+                "team_id": team_id,
+                "trigger_type": action_type, # e.g. "create_jira_ticket"
+                "status": "completed" if result["success"] else "failed",
+                "model_config": {
+                    "confidence": 1.0, # Explicit user action = 100% confidence
+                    "reasoning": f"Manual trigger by user {current_user.get('email', 'unknown')}",
+                    "params": params
+                },
+                "started_at": os.popen("date -u +%Y-%m-%dT%H:%M:%SZ").read().strip() or str(datetime.now(timezone.utc))
+            }
+            # Use raw sql or repository method. 
+            # repo.create_inference_run expects slightly different args, let's just insert directly or reuse.
+            # actually create_inference_run is perfect if we tweak it or use it as is.
+            
+            # Re-using create_inference_run but we need to mark it completed immediately
+            # We can just manually insert to be precise with fields
+            from datetime import datetime, timezone
+            
+            db_entry = {
+                "team_id": team_id,
+                "trigger_type": action_type,
+                "status": "completed" if result["success"] else "failed",
+                "model_config": {
+                    "confidence": 1.0,
+                    "reasoning": f"Manual trigger by user {current_user.get('email', 'unknown')}",
+                    "result_summary": result.get("message")
+                },
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "completed_at": datetime.now(timezone.utc).isoformat()
+            }
+            repo.db.table("inference_runs").insert(db_entry).execute()
+            
+            # Also update usage stats if successful!
+            if result["success"]:
+                 # Increment usage counter
+                try:
+                    repo.db.rpc('increment_usage', {'team_id_input': team_id}).execute()
+                except Exception as e:
+                    print(f"Failed to increment usage: {e}")
+
+        except Exception as e:
+            print(f"Failed to log automation: {e}")
+            # Don't fail the request if logging fails, but log error
 
         return result
 

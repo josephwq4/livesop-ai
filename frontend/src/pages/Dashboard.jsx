@@ -14,7 +14,6 @@ import {
     Network,
     List,
     History,
-    History,
     Search,
     X,
     Shield

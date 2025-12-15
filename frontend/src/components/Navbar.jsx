@@ -61,16 +61,15 @@ export default function Navbar() {
 
                     {/* Right Side */}
                     <div className="flex items-center gap-3">
-                        {usage && (
-                            <Link to="/settings" className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mr-2 border transition-all hover:scale-105 ${(usage.automation_count / usage.automation_limit) > 0.9
-                                    ? 'bg-red-50 text-red-600 border-red-200 animate-pulse'
-                                    : 'bg-green-50 text-green-700 border-green-200'
-                                }`}>
-                                <Zap className="w-3 h-3" />
-                                {usage.automation_count} / {usage.automation_limit}
-                                <span className="opacity-75 uppercase text-[10px] ml-1">{usage.plan_tier}</span>
-                            </Link>
-                        )}
+                        {/* Always show usage, default to trial state if loading/error */}
+                        <Link to="/settings" className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mr-2 border transition-all hover:scale-105 ${usage && (usage.automation_count / usage.automation_limit) > 0.9
+                            ? 'bg-red-50 text-red-600 border-red-200 animate-pulse'
+                            : 'bg-green-50 text-green-700 border-green-200'
+                            }`}>
+                            <Zap className="w-3 h-3" />
+                            {usage ? usage.automation_count : 0} / {usage ? usage.automation_limit : 100}
+                            <span className="opacity-75 uppercase text-[10px] ml-1">{usage ? usage.plan_tier : 'TRIAL'}</span>
+                        </Link>
 
                         <Link
                             to="/settings"

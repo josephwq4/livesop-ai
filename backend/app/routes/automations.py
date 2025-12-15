@@ -188,8 +188,19 @@ def get_live_feed(
             print(f"Join query failed: {e}")
             return {"feed": []}
             
+        # Phase B: Skip Surfacing Logic
+        # Filter out low-confidence signals from Live Feed (but they remain in DB for audit)
+        SURFACE_THRESHOLD = 0.5  # Only show signals with confidence >= 50%
+        
         feed = []
         for r in res.data:
+            # Check confidence before surfacing
+            confidence = r.get("model_config", {}).get("confidence", 0.0)
+            
+            # Skip low-confidence signals from Live Feed
+            if confidence < SURFACE_THRESHOLD:
+                continue
+            
             # Flatten structure
             signals_join = r.get("inference_run_signals", [])
             primary_signal = {}
@@ -202,7 +213,7 @@ def get_live_feed(
                 "time": r["started_at"],
                 "channel": primary_signal.get("metadata", {}).get("channel", "Unknown"),
                 "customer": primary_signal.get("actor", "Unknown"),
-                "confidence": r.get("model_config", {}).get("confidence", 0.0), # Default 0
+                "confidence": confidence,
                 "action": r["trigger_type"],
                 "status": r["status"],
                 

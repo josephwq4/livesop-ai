@@ -137,6 +137,48 @@ def evaluate_signal(team_id: str, signal: Dict[str, Any], dry_run: bool = False)
 
         # 5. Execution (If Passed)
         if should_execute:
+            # Phase B: Safety Gates
+            # Check 1: Global Kill Switch
+            global_enabled = repo.get_team_auto_pilot_status(team_id)
+            if not global_enabled:
+                print(f"[Auto-Pilot] BLOCKED: Global Auto-Pilot disabled for team {team_id}")
+                repo.db.table("inference_runs").update({
+                    "status": "skipped",
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "model_config": {
+                         "matched_node": matched_node.get("data", {}).get("label"),
+                         "confidence": confidence,
+                         "reasoning": reasoning,
+                         "threshold": THRESHOLD,
+                         "signal_text": signal_text,
+                         "dry_run": dry_run,
+                         "idempotency_key": idempotency_key,
+                         "skip_reason": "global_auto_pilot_disabled"
+                    }
+                }).eq("id", run_id).execute()
+                return
+            
+            # Check 2: Per-Node Auto-Run Flag
+            node_id = matched_node.get("id")
+            node_enabled = repo.get_node_auto_run_status(node_id)
+            if not node_enabled:
+                print(f"[Auto-Pilot] BLOCKED: Node {node_id} has Auto-Run disabled")
+                repo.db.table("inference_runs").update({
+                    "status": "skipped",
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "model_config": {
+                         "matched_node": matched_node.get("data", {}).get("label"),
+                         "confidence": confidence,
+                         "reasoning": reasoning,
+                         "threshold": THRESHOLD,
+                         "signal_text": signal_text,
+                         "dry_run": dry_run,
+                         "idempotency_key": idempotency_key,
+                         "skip_reason": f"node_auto_run_disabled:{node_id}"
+                    }
+                }).eq("id", run_id).execute()
+                return
+            
             # Recheck Dry Run
             if dry_run:
                 # Log simulated success

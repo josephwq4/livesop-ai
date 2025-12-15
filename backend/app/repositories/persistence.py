@@ -26,6 +26,45 @@ class PersistenceRepository:
         res = self.db.table("teams").insert(data).execute()
         return res.data[0]["id"]
 
+    def get_team_auto_pilot_status(self, team_id: str) -> bool:
+        """Check if Auto-Pilot is globally enabled for a team"""
+        try:
+            res = self.db.table("teams").select("auto_pilot_enabled").eq("id", team_id).single().execute()
+            return res.data.get("auto_pilot_enabled", True) if res.data else True
+        except Exception as e:
+            print(f"[DB Error] Get Auto-Pilot Status: {e}")
+            return True  # Fail-open for safety (allow execution if check fails)
+
+    def set_team_auto_pilot_status(self, team_id: str, enabled: bool) -> bool:
+        """Toggle global Auto-Pilot kill switch for a team"""
+        try:
+            self.db.table("teams").update({"auto_pilot_enabled": enabled}).eq("id", team_id).execute()
+            return True
+        except Exception as e:
+            print(f"[DB Error] Set Auto-Pilot Status: {e}")
+            return False
+
+    def get_node_auto_run_status(self, node_id: str) -> bool:
+        """Check if a specific node has Auto-Run enabled"""
+        try:
+            res = self.db.table("workflow_nodes").select("auto_run_enabled, metadata").eq("step_id", node_id).single().execute()
+            if not res.data:
+                return False
+            # Check both the column and metadata.auto_pilot for backward compatibility
+            return res.data.get("auto_run_enabled", False) or res.data.get("metadata", {}).get("auto_pilot", False)
+        except Exception as e:
+            print(f"[DB Error] Get Node Auto-Run: {e}")
+            return False
+
+    def set_node_auto_run_status(self, node_id: str, enabled: bool) -> bool:
+        """Toggle Auto-Run for a specific workflow node"""
+        try:
+            self.db.table("workflow_nodes").update({"auto_run_enabled": enabled}).eq("step_id", node_id).execute()
+            return True
+        except Exception as e:
+            print(f"[DB Error] Set Node Auto-Run: {e}")
+            return False
+
     # --- RAW SIGNALS ---
     def ingest_signals(self, team_id: str, signals: List[Dict[str, Any]]) -> List[str]:
         """

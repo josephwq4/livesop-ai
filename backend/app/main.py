@@ -13,8 +13,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# IMPORTANT: Baseline Stability (Auth + Usage + Settings Only). Disable EVERYTHING else.
-from app.routes import health, usage, settings #, integrations, automations, workflows, knowledge, webhooks
+# IMPORTANT: Re-enable Integrations + Automations (Testing Phase 27)
+from app.routes import health, usage, settings, integrations, automations #, workflows, knowledge, webhooks
 
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
@@ -43,8 +43,8 @@ app.add_middleware(
 
 print("[INFO] Loading routers...")
 
-# Core Integrations (Disabled)
-# app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
+# Core Integrations (CONFIRMED SAFE - Re-enabling)
+app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
 
 # ML Workflows (Disabled)
 # app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
@@ -56,8 +56,8 @@ print("[INFO] Loading routers...")
 app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
 app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 
-# Automations (Disabled)
-# app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
+# Automations (CONFIRMED SAFE - Re-enabling)
+app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
 
 # Webhooks (Disabled)
 # app.include_router(webhooks.router, prefix="/webhooks")

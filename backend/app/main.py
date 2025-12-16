@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, Request
+ase from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os

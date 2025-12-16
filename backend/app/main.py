@@ -13,8 +13,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# IMPORTANT: Testing Workflows/Knowledge
-from app.routes import health, usage, settings, integrations, automations, workflows, knowledge
+# IMPORTANT: Bisect Workflows vs Knowledge
+from app.routes import health, usage, settings, integrations, automations, workflows #, knowledge
 # from app.routes import webhooks
 
 from app.dependencies.auth import get_current_user
@@ -50,8 +50,8 @@ app.include_router(integrations.router, prefix="/integrations", dependencies=[De
 # ML Workflows (Testing this!)
 app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
 
-# Knowledge Base (Testing this!)
-app.include_router(knowledge.router, prefix="/knowledge", dependencies=[Depends(get_current_user)])
+# Knowledge Base (Disabled to bisect)
+# app.include_router(knowledge.router, prefix="/knowledge", dependencies=[Depends(get_current_user)])
 
 # Basic CRUD
 app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
@@ -60,7 +60,7 @@ app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 # Automations (CONFIRMED SAFE)
 app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
 
-# Webhooks (Disabled - Suspect)
+# Webhooks (Disabled)
 # app.include_router(webhooks.router, prefix="/webhooks")
 
 # Health

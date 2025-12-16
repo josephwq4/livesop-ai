@@ -10,10 +10,27 @@ CHROMADB_AVAILABLE = False
 from app.services.integration_clients import fetch_all_events
 
 
-# Lazy load OpenAI client prevents import-time crashes
+class MockOpenAI:
+    def __init__(self, **kwargs): pass
+    @property
+    def chat(self): return MockChat()
+    @property
+    def embeddings(self): return MockEmbeddings()
+
+class MockChat:
+    @property
+    def completions(self): return MockCompletions()
+
+class MockCompletions:
+    def create(self, **kwargs): raise Exception("OpenAI Disabled")
+
+class MockEmbeddings:
+    def create(self, **kwargs): raise Exception("OpenAI Disabled")
+
 def get_openai_client():
-    from openai import OpenAI
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-test-key"))
+    # from openai import OpenAI
+    # return OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-test-key"))
+    return MockOpenAI()
 
 # Initialize ChromaDB for vector storage (if available)
 if CHROMADB_AVAILABLE:

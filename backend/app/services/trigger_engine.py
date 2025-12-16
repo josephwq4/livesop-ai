@@ -7,10 +7,21 @@ from app.services.automation_service import run_automation_logic
 # Import OpenAI client (Assumes initialized in workflow_inference or reusable here)
 # from openai import OpenAI
 
-# Init OpenAI (ensure key is available or fallback to prevent crash)
+class MockOpenAI:
+    def __init__(self, **kwargs): pass
+    @property
+    def chat(self): return MockChat()
+
+class MockChat:
+    @property
+    def completions(self): return MockCompletions()
+
+class MockCompletions:
+    def create(self, **kwargs): raise Exception("OpenAI Disabled")
+
 def get_openai_client():
-    from openai import OpenAI
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-placeholder"))
+    # from openai import OpenAI
+    return MockOpenAI()
 
 from app.services.rag_service import RAGService
 

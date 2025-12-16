@@ -1,8 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, Response
-from app.services.workflow_inference import infer_workflow, generate_sop_document, query_similar_events
+# from app.services.workflow_inference import infer_workflow, generate_sop_document, query_similar_events
 from app.models.workflow import WorkflowGraph
 from typing import Optional, Dict, Any
 from app.dependencies.auth import get_current_user
+
+# Stub logic to identify import crash
+def infer_workflow(*args, **kwargs): return {}
+def generate_sop_document(*args, **kwargs): return "SOP stub"
+def query_similar_events(*args, **kwargs): return []
 
 router = APIRouter(tags=["workflows"])
 
@@ -80,7 +85,8 @@ def search_knowledge(
     """Semantic Search (RAG) over team signals"""
     try:
         from app.repositories.persistence import PersistenceRepository
-        from app.services.workflow_inference import generate_embeddings
+        # from app.services.workflow_inference import generate_embeddings
+        def generate_embeddings(texts): return [[0.0]] # Stub
         
         repo = PersistenceRepository()
         

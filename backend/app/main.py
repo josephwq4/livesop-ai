@@ -1,25 +1,57 @@
-from fastapi import FastAPI, Request, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+import sys
 import os
 from pathlib import Path
 
-# 1. Load Env
+# Boot Tracing
+def boot_log(msg):
+    print(f"[BOOT] {msg}", flush=True)
+
+boot_log("Initializing Application Context...")
+
+from fastapi import FastAPI, Request, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+boot_log("Loading Environment Variables...")
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
+boot_log("Loading External Dependencies (SlowAPI)...")
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# 2. Dependencies
+boot_log("Loading Internal Dependencies (Auth, Logging)...")
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
 
-# 3. Routers (Phase 37: Add Stubbed Integrations + Automations)
-from app.routes import health, usage, settings, integrations, automations
+boot_log("Loading Routers...")
 
+boot_log("-> Importing Health Router")
+from app.routes import health
+
+boot_log("-> Importing Usage Router")
+from app.routes import usage
+
+boot_log("-> Importing Settings Router")
+from app.routes import settings
+
+boot_log("-> Importing Integrations Router (STUBBED)")
+from app.routes import integrations
+
+boot_log("-> Importing Automations Router (STUBBED)")
+from app.routes import automations
+
+# Disabled Routers - Commented out to prevent load
+# boot_log("-> Importing Workflows Router")
+# from app.routes import workflows
+# boot_log("-> Importing Knowledge Router")
+# from app.routes import knowledge
+# boot_log("-> Importing Webhooks Router")
+# from app.routes import webhooks
+
+boot_log("Initializing FastAPI App...")
 limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title="LiveSOP AI", version="1.0.0")
@@ -42,17 +74,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+boot_log("Registering Routes...")
 # Active Routers
 app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
 app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
-app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)]) # Currently Stubbed
+app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
 app.include_router(health.router, prefix="")
 
 @app.get("/")
 @limiter.limit("50/minute")
 def root(request: Request):
-    return {"message": "LiveSOP AI (Stable Base Active)", "status": "running"}
+    return {"message": "LiveSOP AI (Checkpoint Alpha)", "status": "running"}
+
+boot_log("Application Ready.")
 
 if __name__ == "__main__":
     import uvicorn

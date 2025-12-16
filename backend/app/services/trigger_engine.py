@@ -8,7 +8,8 @@ from app.services.automation_service import run_automation_logic
 from openai import OpenAI
 
 # Init OpenAI (ensure key is available)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Init OpenAI (ensure key is available or fallback to prevent crash)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-placeholder"))
 
 from app.services.rag_service import RAGService
 

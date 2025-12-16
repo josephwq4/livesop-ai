@@ -1,10 +1,6 @@
 import os
 from typing import List, Dict, Any
-from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
-from jira import JIRA
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
+
 from datetime import datetime
 
 
@@ -55,7 +51,7 @@ _slack_user_cache: Dict[str, str] = {}
 _cache_timestamp: float = 0
 CACHE_TTL = 3600  # 1 hour
 
-def _get_slack_users_map(client: WebClient) -> Dict[str, str]:
+def _get_slack_users_map(client: Any) -> Dict[str, str]:
     """Fetch all users and map ID -> Real Name. Uses caching."""
     global _slack_user_cache, _cache_timestamp
     import time
@@ -116,6 +112,7 @@ def fetch_slack_events(token: str, channels: List[str]) -> List[Dict[str, Any]]:
         ]
     
     try:
+        from slack_sdk import WebClient
         client = WebClient(token=token)
         events = []
         user_map = _get_slack_users_map(client)
@@ -139,7 +136,7 @@ def fetch_slack_events(token: str, channels: List[str]) -> List[Dict[str, Any]]:
             # 1. Fetch History (Roots)
             try:
                 history = client.conversations_history(channel=channel_id, limit=20)
-            except SlackApiError as e:
+            except Exception as e:
                 print(f"Error reading channel {channel_name} ({channel_id}): {e}")
                 continue
 
@@ -209,6 +206,7 @@ def fetch_slack_history_for_kb(token: str, channels: List[str], limit_per_channe
     """Fetch history items for Knowledge Base"""
     if not token: return []
     try:
+        from slack_sdk import WebClient
         client = WebClient(token=token)
         items = []
         user_map = _get_slack_users_map(client)
@@ -292,6 +290,7 @@ def fetch_jira_issues(api_key: str, project: str) -> List[Dict[str, Any]]:
             ]
     
     try:
+        from jira import JIRA
         # Jira Cloud requires Email + API Token (Basic Auth)
         # Verify if we have an email, otherwise try token_auth (PAT)
         if jira_email and "@" in jira_email:
@@ -358,6 +357,9 @@ def fetch_gmail_threads(credentials_json: str, label: str) -> List[Dict[str, Any
         ]
     
     try:
+        from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build
+        
         # In production, use proper OAuth2 credentials
         creds = Credentials.from_authorized_user_info(eval(credentials_json))
         service = build('gmail', 'v1', credentials=creds)
@@ -447,14 +449,21 @@ def send_slack_message(token: str, channel: str, text: str) -> Dict[str, Any]:
         return {"success": False, "error": "Missing token or channel"}
         
     try:
+        from slack_sdk import WebClient
+        
         client = WebClient(token=token)
         # Handle channel name vs ID if needed, but chat_postMessage handles usage of name usually?
         # Ideally using an ID is safer.
         response = client.chat_postMessage(channel=channel, text=text)
         return {"success": True, "ts": response["ts"]}
-    except SlackApiError as e:
-        print(f"Slack Send Error: {e.response['error']}")
-        return {"success": False, "error": str(e.response['error'])}
+    except Exception as e:
+        # If it was a SlackApiError, it has a response attribute. Exception might not.
+        error_msg = str(e)
+        if hasattr(e, 'response') and 'error' in e.response:
+             error_msg = str(e.response['error'])
+        
+        print(f"Slack Send Error: {error_msg}")
+        return {"success": False, "error": error_msg}
 
 def create_jira_issue(api_key: str, project_key: str, summary: str, description: str, issue_type: str = "Task") -> Dict[str, Any]:
     """Create a Jira ticket"""
@@ -471,6 +480,7 @@ def create_jira_issue(api_key: str, project_key: str, summary: str, description:
          return {"success": False, "error": "Missing Project Key"}
 
     try:
+        from jira import JIRA
         if jira_email and "@" in jira_email:
              jira = JIRA(server=jira_server, basic_auth=(jira_email, api_key))
         else:

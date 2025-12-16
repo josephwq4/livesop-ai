@@ -13,7 +13,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# IMPORTANT: Bisect Phase 28 - Enable Automations ONLY (Disable Integrations)
+# IMPORTANT: Restore Phase 11 State (Integrations + Automations + Empty Stubs)
 from app.routes import health, usage, settings, integrations, automations #, workflows, knowledge, webhooks
 
 from app.dependencies.auth import get_current_user
@@ -43,8 +43,8 @@ app.add_middleware(
 
 print("[INFO] Loading routers...")
 
-# Core Integrations (Disabled for Bisect)
-# app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
+# Core Integrations (Testing RE-LOBOTOMIZED Integrations)
+app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
 
 # ML Workflows (Disabled)
 # app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
@@ -56,7 +56,7 @@ print("[INFO] Loading routers...")
 app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
 app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 
-# Automations (Testing THIS alone)
+# Automations (Testing RE-LOBOTOMIZED Integrations usage)
 app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
 
 # Webhooks (Disabled)

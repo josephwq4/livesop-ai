@@ -17,8 +17,8 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
 
-# 3. Routers (Phase 36: Usage + Settings)
-from app.routes import health, usage, settings
+# 3. Routers (Phase 37: Add Stubbed Integrations + Automations)
+from app.routes import health, usage, settings, integrations, automations
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -45,6 +45,8 @@ app.add_middleware(
 # Active Routers
 app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
 app.include_router(settings.router, dependencies=[Depends(get_current_user)])
+app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
+app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)]) # Currently Stubbed
 app.include_router(health.router, prefix="")
 
 @app.get("/")

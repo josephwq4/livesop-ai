@@ -4,13 +4,15 @@ from typing import List, Dict, Any
 from datetime import datetime
 from openai import OpenAI
 
-try:
-    import chromadb
-    from chromadb.config import Settings
-    CHROMADB_AVAILABLE = True
-except ImportError:
-    CHROMADB_AVAILABLE = False
-    print("ChromaDB not available - using in-memory storage")
+# try:
+#     import chromadb
+#     from chromadb.config import Settings
+#     CHROMADB_AVAILABLE = True
+# except ImportError:
+#     CHROMADB_AVAILABLE = False
+#     print("ChromaDB not available - using in-memory storage")
+
+CHROMADB_AVAILABLE = False
 
 from app.services.integration_clients import fetch_all_events
 

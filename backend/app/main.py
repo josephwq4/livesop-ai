@@ -13,9 +13,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# IMPORTANT: Minimal Router Set + Integrations (to test import safety)
-from app.routes import health, usage, settings, integrations
-# from app.routes import workflows, knowledge, automations, webhooks
+# IMPORTANT: Testing Automations Router
+from app.routes import health, usage, settings, integrations, automations
+# from app.routes import workflows, knowledge, webhooks
 
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
@@ -44,7 +44,7 @@ app.add_middleware(
 
 print("[INFO] Loading routers...")
 
-# Core Integrations (Uses integration_clients stubs)
+# Core Integrations (CONFIRMED SAFE)
 app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
 
 # ML Workflows (Disabled)
@@ -57,8 +57,8 @@ app.include_router(integrations.router, prefix="/integrations", dependencies=[De
 app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
 app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 
-# Automations (Disabled)
-# app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
+# Automations (Testing this!)
+app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
 
 # Webhooks (Disabled)
 # app.include_router(webhooks.router, prefix="/webhooks")

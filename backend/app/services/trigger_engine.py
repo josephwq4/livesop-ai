@@ -5,11 +5,12 @@ from typing import Dict, Any, Tuple
 from app.repositories.persistence import PersistenceRepository
 from app.services.automation_service import run_automation_logic
 # Import OpenAI client (Assumes initialized in workflow_inference or reusable here)
-from openai import OpenAI
+# from openai import OpenAI
 
-# Init OpenAI (ensure key is available)
 # Init OpenAI (ensure key is available or fallback to prevent crash)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-placeholder"))
+def get_openai_client():
+    from openai import OpenAI
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-placeholder"))
 
 from app.services.rag_service import RAGService
 
@@ -53,8 +54,8 @@ def _match_signal_to_nodes(signal_text: str, nodes: list, context_text: str = ""
     """
     
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o", # Use smart model for decision making
+        response = get_openai_client().chat.completions.create(
+            model="gpt-4", # Use smart model for decision making
             messages=[{"role": "system", "content": "You are a deterministic workflow engine."}, {"role": "user", "content": prompt}],
             temperature=0.0,
             response_format={"type": "json_object"}

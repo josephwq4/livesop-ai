@@ -65,6 +65,11 @@ export const updateNode = async (teamId, nodeId, payload) => {
   return response.data;
 };
 
+export const updateWorkflowNodes = async (teamId, workflowId, nodes) => {
+  const response = await api.put(`/workflows/${teamId}/${workflowId}/nodes`, nodes);
+  return response.data;
+};
+
 // Automations API
 export const runAutomation = async (teamId, payload) => {
   const response = await api.post(`/automations/${teamId}/execute`, payload);

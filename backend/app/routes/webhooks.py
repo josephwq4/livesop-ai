@@ -91,6 +91,28 @@ async def process_slack_event(event: dict, slack_team_id: str):
             print(f"❌ [Webhook] Evaluation failed: {eval_error}. Signal logged but not evaluated.")
             # Signal is in DB, can be replayed later
         
+        # Phase K: Real-time Knowledge Capture
+        try:
+            if len(text) > 15:
+                from app.services.rag_service import RAGService
+                rag = RAGService()
+                await asyncio.to_thread(
+                    rag.add_document, 
+                    target_team_id, 
+                    f"Slack #{channel} ({actor}): {text}", 
+                    {
+                      "source": "slack",
+                      "channel": channel,
+                      "actor": actor,
+                      "timestamp": datetime.fromtimestamp(float(ts)).isoformat(),
+                      "slack_ts": ts,
+                      "filename": f"Slack Stream #{channel}"
+                    }
+                )
+                print(f"📚 [Webhook] Captured knowledge from {actor}")
+        except Exception as kb_e:
+            print(f"⚠️ [Webhook] KB Capture Failed: {kb_e}")
+        
     except Exception as e:
         print(f"❌ [Webhook] Critical error processing event: {e}")
         import traceback

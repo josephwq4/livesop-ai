@@ -10,7 +10,9 @@ from openai import OpenAI
 # Init OpenAI (ensure key is available)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def _match_signal_to_nodes(signal_text: str, nodes: list) -> Tuple[Dict, float, str]:
+from app.services.rag_service import RAGService
+
+def _match_signal_to_nodes(signal_text: str, nodes: list, context_text: str = "") -> Tuple[Dict, float, str]:
     """
     Uses LLM to determine if the signal matches any auto-pilot enabled node.
     Returns: (matched_node, confidence_score, reasoning)
@@ -19,7 +21,7 @@ def _match_signal_to_nodes(signal_text: str, nodes: list) -> Tuple[Dict, float, 
         return None, 0.0, "No active nodes"
 
     # Filter only auto-pilot nodes
-    candidates = [n for n in nodes if n.get("data", {}).get("auto_pilot")]
+    candidates = [n for n in nodes if n.get("data", {}).get("auto_pilot") or n.get("auto_run_enabled")] # Check both flag locations
     if not candidates:
         return None, 0.0, "No auto-pilot nodes enabled"
 
@@ -32,6 +34,9 @@ def _match_signal_to_nodes(signal_text: str, nodes: list) -> Tuple[Dict, float, 
     Analyze the incoming signal against the following workflow nodes.
     Determine if the signal explicitly triggers any of them with high confidence.
     
+    Context from Knowledge Base (Use this to inform your decision):
+    {context_text if context_text else 'No additional context available.'}
+    
     Signal: "{signal_text}"
     
     Candidate Nodes:
@@ -42,7 +47,7 @@ def _match_signal_to_nodes(signal_text: str, nodes: list) -> Tuple[Dict, float, 
         "match": true/false,
         "node_id": "step_id_or_null",
         "confidence": 0.0_to_1.0,
-        "reasoning": "brief explanation"
+        "reasoning": "brief explanation citing context if relevant"
     }}
     """
     
@@ -96,10 +101,23 @@ def evaluate_signal(team_id: str, signal: Dict[str, Any], dry_run: bool = False)
             print("[Trigger] No active workflow.")
             return
 
+        # 1.5 Fetch Context (RAG)
+        context_docs = []
+        context_text = ""
+        try:
+            rag = RAGService()
+            context_docs = rag.search_context(team_id, signal_text, limit=3)
+            if context_docs:
+                context_text = "\n".join([f"- {d['content'][:500]} (Source: {d['metadata'].get('filename', 'Unknown')})" for d in context_docs])
+                print(f"[Trigger] Found {len(context_docs)} relevant KB items.")
+        except Exception as rag_err:
+             print(f"[Trigger] RAG Error: {rag_err}")
+
         # 2. Intelligent Match
         matched_node, confidence, reasoning = _match_signal_to_nodes(
             signal_text, 
-            workflow["nodes"]
+            workflow["nodes"],
+            context_text
         )
         
         # 3. Decision Gate (Default 0.9)
@@ -124,7 +142,13 @@ def evaluate_signal(team_id: str, signal: Dict[str, Any], dry_run: bool = False)
                 "threshold": THRESHOLD,
                 "signal_text": signal_text,
                 "dry_run": dry_run,
-                "idempotency_key": idempotency_key
+                "idempotency_key": idempotency_key,
+                "context_sources": [{ 
+                    "title": d['metadata'].get("filename", "Unknown"), 
+                    "snippet": d['content'][:150],
+                    "source_type": d['metadata'].get("source", "manual"),
+                    "metadata": d['metadata']
+                } for d in context_docs]
             },
             "started_at": datetime.now(timezone.utc).isoformat()
         }

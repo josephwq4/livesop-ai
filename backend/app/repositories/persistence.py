@@ -304,6 +304,35 @@ class PersistenceRepository:
             print(f"[DB Error] Update Node: {e}")
             return False
 
+    def update_workflow_nodes_batch(self, workflow_id: str, nodes_data: List[Dict]) -> bool:
+        """
+        Updates multiple nodes for a given workflow.
+        nodes_data expects: [{ "id": "step_id", "label": "...", "metadata": {...}, "auto_run_enabled": bool, ... }]
+        """
+        try:
+            for node in nodes_data:
+                # Prepare update payload
+                update_payload = {}
+                if "label" in node: update_payload["label"] = node["label"]
+                if "description" in node: update_payload["description"] = node["description"]
+                if "auto_run_enabled" in node: update_payload["auto_run_enabled"] = node["auto_run_enabled"]
+                if "metadata" in node: 
+                    # Identify if existing metadata needs merging or valid overwrite
+                    # For safety, fetch and merge if partial update, but if FE sends full object, overwrite is faster.
+                    # Assuming FE sends full metadata state including position.
+                    update_payload["metadata"] = node["metadata"]
+                
+                if update_payload:
+                    self.db.table("workflow_nodes")\
+                        .update(update_payload)\
+                        .eq("workflow_id", workflow_id)\
+                        .eq("step_id", node["id"])\
+                        .execute()
+            return True
+        except Exception as e:
+            print(f"[DB Error] Batch Update Nodes: {e}")
+            raise e
+
     def get_active_workflow(self, team_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves the currently active workflow graph."""
         try:
@@ -343,3 +372,62 @@ class PersistenceRepository:
         except Exception as e:
             print(f"[DB Error] Get By ID: {e}")
             return None
+
+    # --- KNOWLEDGE BASE ---
+    def add_knowledge_item(self, team_id: str, content: str, embedding: List[float], metadata: Dict) -> str:
+        data = {
+            "team_id": team_id,
+            "content": content,
+            "embedding": embedding,
+            "metadata": metadata,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        res = self.db.table("knowledge_base").insert(data).execute()
+        return res.data[0]["id"]
+
+    def search_knowledge_base(self, team_id: str, query_embedding: List[float], limit: int = 5, threshold: float = 0.7) -> List[Dict]:
+        try:
+             res = self.db.rpc("match_knowledge_base", {
+                "query_embedding": query_embedding,
+                "match_threshold": threshold,
+                "match_count": limit,
+                "filter_team_id": team_id
+            }).execute()
+             return res.data
+        except Exception as e:
+            print(f"[DB Error] KB Search: {e}")
+            return []
+
+    def get_knowledge_items(self, team_id: str) -> List[Dict]:
+        try:
+            res = self.db.table("knowledge_base")\
+                .select("id, content, metadata, created_at")\
+                .eq("team_id", team_id)\
+                .order("created_at", desc=True)\
+                .execute()
+            return res.data
+        except Exception as e:
+            print(f"[DB Error] Get KB: {e}")
+            return []
+            
+    def delete_knowledge_item(self, item_id: str, team_id: str) -> bool:
+        try:
+            self.db.table("knowledge_base").delete().eq("id", item_id).eq("team_id", team_id).execute()
+            return True
+        except Exception as e:
+            return False
+
+    def bulk_insert_knowledge(self, rows: List[Dict]) -> int:
+        if not rows: return 0
+        try:
+            # Chunking for safety
+            chunk_size = 100
+            total = 0
+            for i in range(0, len(rows), chunk_size):
+                chunk = rows[i:i + chunk_size]
+                self.db.table("knowledge_base").insert(chunk).execute()
+                total += len(chunk)
+            return total
+        except Exception as e:
+            print(f"[DB Error] Bulk KB: {e}")
+            return 0

@@ -137,6 +137,42 @@ def get_sop(team_id: str, workflow_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=f"Error generating SOP: {str(e)}")
 
 
+from pydantic import BaseModel
+
+class WorkflowNodeBatchUpdate(BaseModel):
+    id: str
+    label: Optional[str] = None
+    description: Optional[str] = None
+    auto_run_enabled: Optional[bool] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+@router.put("/{team_id}/{workflow_id}/nodes")
+def update_workflow_nodes(
+    team_id: str,
+    workflow_id: str,
+    nodes: List[WorkflowNodeBatchUpdate],
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Batch update nodes. Used by Visual Workflow Builder to save layout and properties.
+    """
+    try:
+        from app.repositories.persistence import PersistenceRepository
+        repo = PersistenceRepository()
+        
+        # Convert Pydantic models to dicts
+        nodes_data = [n.dict(exclude_unset=True) for n in nodes]
+        
+        success = repo.update_workflow_nodes_batch(workflow_id, nodes_data)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update nodes")
+            
+        return {"success": True, "message": "Nodes updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.patch("/{team_id}/nodes/{node_id}")
 def update_node(
     team_id: str, 

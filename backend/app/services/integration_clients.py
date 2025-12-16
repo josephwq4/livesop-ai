@@ -6,6 +6,7 @@ from jira import JIRA
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from datetime import datetime
+import httpx
 
 
 def fetch_all_events(team_id: str) -> List[Dict[str, Any]]:
@@ -202,6 +203,60 @@ def fetch_slack_events(token: str, channels: List[str]) -> List[Dict[str, Any]]:
         print(f"Slack Client Error: {e}")
         return []
 
+
+
+def fetch_slack_history_for_kb(token: str, channels: List[str], limit_per_channel: int = 50) -> List[Dict]:
+    """Fetch history items for Knowledge Base"""
+    if not token: return []
+    try:
+        client = WebClient(token=token)
+        items = []
+        user_map = _get_slack_users_map(client)
+
+        for channel_name in channels:
+            channel_id = channel_name
+            # Resolve Name -> ID
+            if not channel_name.startswith("C"):
+                try:
+                    for result in client.conversations_list(types="public_channel,private_channel"):
+                        for c in result["channels"]:
+                            if c["name"] == channel_name:
+                                channel_id = c["id"]
+                                break
+                except: pass
+
+            try:
+                history = client.conversations_history(channel=channel_id, limit=limit_per_channel)
+                if not history.get("messages"): continue
+                
+                for msg in history["messages"]:
+                    text = msg.get("text", "")
+                    if not text or len(text) < 15: continue # Skip short/empty
+                    if msg.get("subtype"): continue 
+                    
+                    user = msg.get("user")
+                    actor = user_map.get(user, user)
+                    ts = float(msg.get("ts", 0))
+                    
+                    items.append({
+                        "content": f"Slack #{channel_name} ({actor}): {text}",
+                        "metadata": {
+                            "source": "slack",
+                            "subtype": "history",
+                            "channel": channel_name,
+                            "actor": actor,
+                            "timestamp": datetime.fromtimestamp(ts).isoformat(),
+                            "slack_ts": msg["ts"],
+                            "filename": f"Slack #{channel_name} Log"
+                        }
+                    })
+            except Exception as e:
+                print(f"Error fetching logs for {channel_name}: {e}")
+                
+        return items
+    except Exception as e:
+        print(f"Slack History Fetch Error: {e}")
+        return []
 
 def fetch_jira_issues(api_key: str, project: str) -> List[Dict[str, Any]]:
     """Fetch issues from Jira project"""
@@ -436,3 +491,78 @@ def create_jira_issue(api_key: str, project_key: str, summary: str, description:
     except Exception as e:
         print(f"Jira Create Error: {e}")
         return {"success": False, "error": str(e)}
+
+def fetch_notion_docs_for_kb(api_key: str) -> List[Dict]:
+    """Fetch Notion documents using httpx (Sync)"""
+    if not api_key: return []
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        with httpx.Client() as client:
+            # 1. Search for all pages
+            search_res = client.post("https://api.notion.com/v1/search", 
+                headers=headers, 
+                json={"filter": {"value": "page", "property": "object"}}
+            )
+            if search_res.status_code != 200:
+                print(f"Notion Search Failed: {search_res.text}")
+                return []
+
+            data = search_res.json()
+            results = data.get("results", [])
+            
+            items = []
+            for page in results:
+                page_id = page["id"]
+                
+                # Title extraction
+                title = "Untitled"
+                props = page.get("properties", {})
+                for key, val in props.items():
+                    if val["type"] == "title" and val["title"]:
+                        title = val["title"][0]["plain_text"]
+                        break
+                        
+                # 2. Fetch Blocks (Content)
+                try:
+                    blocks_res = client.get(f"https://api.notion.com/v1/blocks/{page_id}/children?page_size=100", headers=headers)
+                    if blocks_res.status_code != 200: continue
+                    
+                    blocks_data = blocks_res.json()
+                    content_lines = []
+                    
+                    for block in blocks_data.get("results", []):
+                        btype = block["type"]
+                        # Extract basic text
+                        if btype in block and isinstance(block[btype], dict) and "rich_text" in block[btype]:
+                             text_objs = block[btype]["rich_text"]
+                             text = "".join([t["plain_text"] for t in text_objs])
+                             if text: content_lines.append(text)
+                    
+                    full_text = "\n".join(content_lines)
+                    if not full_text or len(full_text) < 20: continue
+                    
+                    items.append({
+                        "content": f"Notion Page: {title}\n\n{full_text}",
+                        "metadata": {
+                            "source": "notion",
+                            "subtype": "page",
+                            "page_id": page_id,
+                            "title": title,
+                            "url": page.get("url"),
+                            "filename": f"Notion: {title}"
+                        }
+                    })
+                except Exception as be:
+                    print(f"Error fetching blocks for {page_id}: {be}")
+            
+            return items
+
+    except Exception as e:
+        print(f"Notion Fetch Error: {e}")
+        return []

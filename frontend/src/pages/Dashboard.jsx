@@ -18,6 +18,7 @@ import {
     X,
     Shield,
     CheckCircle,
+    Book,
     Activity,
     Clock,
     AlertTriangle,
@@ -30,6 +31,8 @@ import { getLiveFeed, getTeamUsage } from '../services/api';
 
 import Navbar from '../components/Navbar';
 import TrustPanel from '../components/TrustPanel';
+import WorkflowEditor from '../components/WorkflowEditor';
+import KnowledgeBase from '../components/KnowledgeBase';
 
 export default function Dashboard() {
     const [workflow, setWorkflow] = useState(null);
@@ -476,6 +479,17 @@ export default function Dashboard() {
                         <FileText className="w-5 h-5" />
                         SOP
                     </button>
+
+                    <button
+                        onClick={() => setView('kb')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${view === 'kb'
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md'
+                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                    >
+                        <Book className="w-5 h-5" />
+                        Knowledge
+                    </button>
                 </div>
 
                 {/* Content Area */}
@@ -529,12 +543,12 @@ export default function Dashboard() {
                         )}
 
                         {view === 'flowchart' && (
-                            <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                                    <Network className="w-6 h-6 text-purple-600" />
-                                    Workflow Visualization
-                                </h2>
-                                <FlowChart workflow={workflow} />
+                            <div className="animate-fade-in-up">
+                                <WorkflowEditor
+                                    workflow={workflow}
+                                    teamId={realTeamId}
+                                    onRefresh={loadWorkflows}
+                                />
                             </div>
                         )}
 
@@ -553,6 +567,12 @@ export default function Dashboard() {
                                         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {view === 'kb' && (
+                            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-gray-700">
+                                <KnowledgeBase teamId={realTeamId} />
                             </div>
                         )}
 

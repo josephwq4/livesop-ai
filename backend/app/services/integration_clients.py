@@ -493,8 +493,8 @@ def create_jira_issue(api_key: str, project_key: str, summary: str, description:
         return {"success": False, "error": str(e)}
 
 def fetch_notion_docs_for_kb(api_key: str) -> List[Dict]:
-    """Fetch Notion documents using httpx (Sync)"""
-    import httpx
+    """Fetch Notion documents using requests (Sync) - Replaces httpx for stability"""
+    import requests
     if not api_key: return []
     
     headers = {
@@ -504,7 +504,7 @@ def fetch_notion_docs_for_kb(api_key: str) -> List[Dict]:
     }
     
     try:
-        with httpx.Client() as client:
+        with requests.Session() as client:
             # 1. Search for all pages
             search_res = client.post("https://api.notion.com/v1/search", 
                 headers=headers, 

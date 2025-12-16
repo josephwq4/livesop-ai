@@ -6,7 +6,7 @@ from jira import JIRA
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from datetime import datetime
-import httpx
+
 
 
 def fetch_all_events(team_id: str) -> List[Dict[str, Any]]:
@@ -494,6 +494,7 @@ def create_jira_issue(api_key: str, project_key: str, summary: str, description:
 
 def fetch_notion_docs_for_kb(api_key: str) -> List[Dict]:
     """Fetch Notion documents using httpx (Sync)"""
+    import httpx
     if not api_key: return []
     
     headers = {

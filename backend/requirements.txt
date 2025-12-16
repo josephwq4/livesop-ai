@@ -17,3 +17,4 @@ pyjwt
 slowapi
 supabase
 httpx
+requests

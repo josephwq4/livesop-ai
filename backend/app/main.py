@@ -13,8 +13,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# IMPORTANT: Disable Webhooks to recover stability
-from app.routes import health, usage, settings, integrations, automations, workflows, knowledge #, webhooks
+# IMPORTANT: Disable Webhooks AND Knowledge to recover Phase 18 stability
+from app.routes import health, usage, settings, integrations, automations, workflows #, knowledge, webhooks
 
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
@@ -49,8 +49,8 @@ app.include_router(integrations.router, prefix="/integrations", dependencies=[De
 # ML Workflows (Stubbed ML, Router Safe)
 app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
 
-# Knowledge Base (Testing this!)
-app.include_router(knowledge.router, prefix="/knowledge", dependencies=[Depends(get_current_user)])
+# Knowledge Base (Disabled - Suspected Cause of Phase 19/22 Crash)
+# app.include_router(knowledge.router, prefix="/knowledge", dependencies=[Depends(get_current_user)])
 
 # Basic CRUD
 app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
@@ -59,7 +59,7 @@ app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 # Automations (CONFIRMED SAFE)
 app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
 
-# Webhooks (Disabled - Suspected Cause)
+# Webhooks (Disabled)
 # app.include_router(webhooks.router, prefix="/webhooks")
 
 # Health

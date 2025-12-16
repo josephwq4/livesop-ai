@@ -13,8 +13,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# IMPORTANT: Enable ALL Routers (Final Check)
-from app.routes import health, usage, settings, integrations, automations, workflows, knowledge, webhooks
+# IMPORTANT: Disable Webhooks to recover stability
+from app.routes import health, usage, settings, integrations, automations, workflows, knowledge #, webhooks
 
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
@@ -59,8 +59,8 @@ app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 # Automations (CONFIRMED SAFE)
 app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
 
-# Webhooks (Testing This! Uses trigger_engine)
-app.include_router(webhooks.router, prefix="/webhooks")
+# Webhooks (Disabled - Suspected Cause)
+# app.include_router(webhooks.router, prefix="/webhooks")
 
 # Health
 app.include_router(health.router, prefix="")

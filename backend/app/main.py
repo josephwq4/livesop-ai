@@ -13,8 +13,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# IMPORTANT: Disable Webhooks AND Knowledge to recover Phase 18 stability
-from app.routes import health, usage, settings, integrations, automations, workflows #, knowledge, webhooks
+# IMPORTANT: Minimal Safe Router Set (Recovery Mode)
+from app.routes import health, usage, settings, integrations, automations #, workflows, knowledge, webhooks
 
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
@@ -46,10 +46,10 @@ print("[INFO] Loading routers...")
 # Core Integrations (CONFIRMED SAFE)
 app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
 
-# ML Workflows (Stubbed ML, Router Safe)
-app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
+# ML Workflows (Disabled - Investigating)
+# app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
 
-# Knowledge Base (Disabled - Suspected Cause of Phase 19/22 Crash)
+# Knowledge Base (Disabled)
 # app.include_router(knowledge.router, prefix="/knowledge", dependencies=[Depends(get_current_user)])
 
 # Basic CRUD

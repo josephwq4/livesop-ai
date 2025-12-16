@@ -2,30 +2,31 @@ import os
 import json
 from typing import List, Dict, Any
 from datetime import datetime
-from openai import OpenAI
+# from openai import OpenAI
 
-# try:
-#     import chromadb
-#     from chromadb.config import Settings
-#     CHROMADB_AVAILABLE = True
-# except ImportError:
-#     CHROMADB_AVAILABLE = False
-#     print("ChromaDB not available - using in-memory storage")
-
+# Force Disable ChromaDB to rule out C-extension crash
 CHROMADB_AVAILABLE = False
 
 from app.services.integration_clients import fetch_all_events
 
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-test-key"))
+# Lazy load OpenAI client prevents import-time crashes
+def get_openai_client():
+    from openai import OpenAI
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY", "sk-test-key"))
 
 # Initialize ChromaDB for vector storage (if available)
 if CHROMADB_AVAILABLE:
-    chroma_client = chromadb.Client(Settings(
-        anonymized_telemetry=False,
-        allow_reset=True
-    ))
+    # This code is unreachable while CHROMADB_AVAILABLE is False
+    try:
+        import chromadb
+        from chromadb.config import Settings
+        chroma_client = chromadb.Client(Settings(
+            anonymized_telemetry=False,
+            allow_reset=True
+        ))
+    except:
+        chroma_client = None
 else:
     chroma_client = None
 
@@ -53,7 +54,7 @@ def generate_embeddings(texts: List[str]) -> List[List[float]]:
         return [[random.random() for _ in range(1536)] for _ in texts]
     
     try:
-        response = client.embeddings.create(
+        response = get_openai_client().embeddings.create(
             input=texts,
             model="text-embedding-3-small"
         )
@@ -197,7 +198,7 @@ Focus on identifying:
 Return ONLY the JSON, no additional text."""
 
     try:
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are an expert at analyzing team workflows and creating process documentation."},
@@ -398,7 +399,7 @@ This SOP outlines the standard process for developing and deploying new features
 """
     
     try:
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "You are an expert technical writer specializing in creating clear, actionable SOPs."},

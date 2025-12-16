@@ -74,7 +74,7 @@ def _get_slack_users_map(client: Any) -> Dict[str, str]:
         _cache_timestamp = current_time
         print(f"Refreshed Slack User Cache: {len(user_map)} users")
         return user_map
-    except SlackApiError as e:
+    except Exception as e:
         print(f"Warning: Could not resolve Slack users: {e}")
         return {}
 

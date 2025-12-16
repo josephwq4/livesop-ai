@@ -13,9 +13,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# Minimal imports to test DB connection (Persistence) without ML libs
-from app.routes import health, usage, settings
-# from app.routes import workflows, knowledge, integrations, automations, webhooks
+# IMPORTANT: Restore all routers
+from app.routes import health, usage, settings, workflows, knowledge, integrations, automations, webhooks
 
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
@@ -44,13 +43,26 @@ app.add_middleware(
 
 print("[INFO] Loading routers...")
 
-# app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
-# app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
-# app.include_router(knowledge.router, prefix="/knowledge", dependencies=[Depends(get_current_user)])
+# Core Integrations (Lazy Loaded dependencies)
+app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
 
+# ML Workflows (Lazy Loaded where possible, OpenAI guarded)
+app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
+
+# Knowledge Base (Lazy Supabase/RAG)
+app.include_router(knowledge.router, prefix="/knowledge", dependencies=[Depends(get_current_user)])
+
+# Basic CRUD
 app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
 app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 
+# Automations (Imports integration_clients)
+app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
+
+# Webhooks (Public)
+app.include_router(webhooks.router, prefix="/webhooks")
+
+# Health
 app.include_router(health.router, prefix="")
 
 @app.get("/")

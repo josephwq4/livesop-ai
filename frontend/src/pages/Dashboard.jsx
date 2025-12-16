@@ -22,7 +22,9 @@ import {
     Clock,
     AlertTriangle,
     Zap,
-    MoreHorizontal
+    MoreHorizontal,
+    TrendingUp,
+    ArrowUpRight
 } from 'lucide-react';
 import { getLiveFeed, getTeamUsage } from '../services/api';
 
@@ -41,6 +43,7 @@ export default function Dashboard() {
 
     // Live Feed & Usage
     const [feed, setFeed] = useState([]);
+    const [feedLoading, setFeedLoading] = useState(true);
     const [usage, setUsage] = useState(null);
     const [selectedEscalation, setSelectedEscalation] = useState(null);
 
@@ -68,15 +71,53 @@ export default function Dashboard() {
     }, []);
 
     const loadDashboardData = async () => {
+        setFeedLoading(true);
         try {
             const [feedData, usageData] = await Promise.all([
                 getLiveFeed(teamId),
                 getTeamUsage()
             ]);
-            if (feedData.feed) setFeed(feedData.feed);
-            if (usageData.usage) setUsage(usageData.usage);
+            if (feedData.feed && feedData.feed.length > 0) {
+                setFeed(feedData.feed);
+            } else if (localStorage.getItem('demo_mode') === 'true') {
+                // Demo Mode: Inject sample data if feed is empty
+                setFeed([
+                    {
+                        id: 'demo-1',
+                        time: new Date().toISOString(),
+                        channel: '#support-tier3',
+                        customer: 'Acme Corp',
+                        confidence: 0.98,
+                        action: 'Jira Ticket Created',
+                        status: 'completed',
+                        rationale: 'Perfect match for "Database Connection Timeout" pattern. Error logs indicate 503 Service Unavailable.',
+                        content: 'Production is down! Getting 503s on the payments API. Needs immediate look.',
+                        link: '#'
+                    },
+                    {
+                        id: 'demo-2',
+                        time: new Date(Date.now() - 3600000).toISOString(),
+                        channel: '#enterprise-help',
+                        customer: 'Globex',
+                        confidence: 0.92,
+                        action: 'Paged On-Call',
+                        status: 'completed',
+                        rationale: 'Urgent keyword detected + "SLA Breach" risk identified.',
+                        content: 'We are seeing high latency on the reporting dashboard. Can someone check?',
+                        link: '#'
+                    }
+                ]);
+            }
+
+            if (usageData.usage) {
+                setUsage(usageData.usage);
+            } else if (localStorage.getItem('demo_mode') === 'true') {
+                setUsage({ automation_count: 42 });
+            }
         } catch (e) {
             console.error("Dashboard Data Error:", e);
+        } finally {
+            setFeedLoading(false);
         }
     };
 
@@ -317,35 +358,75 @@ export default function Dashboard() {
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-6 py-8">
                 {/* Hero Stats */}
+                {/* Hero Stats - Premium Design */}
                 <div className="grid md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-2xl border border-amber-100 dark:border-amber-800 flex items-center gap-4">
-                        <div className="p-3 bg-amber-100 dark:bg-amber-800 rounded-xl text-amber-600 dark:text-amber-400">
-                            <AlertTriangle className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Escalations Detected</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{feed.length}</p>
-                            <p className="text-xs text-amber-700 dark:text-amber-300">This Week</p>
+                    {/* Stat Card 1: Escalations */}
+                    <div className="relative overflow-hidden bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-lg transition-all duration-300 group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-100 dark:bg-amber-900/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-amber-200 dark:group-hover:bg-amber-900/20"></div>
+                        <div className="relative flex justify-between items-start">
+                            <div>
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Escalations Detected</p>
+                                <h3 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                                    {feed.length}
+                                </h3>
+                                <div className="flex items-center gap-1 mt-2 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-full w-fit">
+                                    <TrendingUp className="w-3 h-3" />
+                                    <span>+12% vs last week</span>
+                                </div>
+                            </div>
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform duration-300">
+                                <AlertTriangle className="w-6 h-6" />
+                            </div>
                         </div>
                     </div>
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border border-blue-100 dark:border-blue-800 flex items-center gap-4">
-                        <div className="p-3 bg-blue-100 dark:bg-blue-800 rounded-xl text-blue-600 dark:text-blue-400">
-                            <Zap className="w-6 h-6" />
+
+                    {/* Stat Card 2: Auto-Resolutions */}
+                    <div className="relative overflow-hidden bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-lg transition-all duration-300 group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 dark:bg-blue-900/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-blue-200 dark:group-hover:bg-blue-900/20"></div>
+                        <div className="relative flex justify-between items-start">
+                            <div>
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Auto-Resolutions</p>
+                                <h3 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                                    {usage?.automation_count || 0}
+                                </h3>
+                                <div className="flex items-center gap-1 mt-2 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full w-fit">
+                                    <Zap className="w-3 h-3" />
+                                    <span>Active now</span>
+                                </div>
+                            </div>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300">
+                                <Zap className="w-6 h-6" />
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Auto-Resolutions</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">{usage?.automation_count || 0}</p>
-                            <p className="text-xs text-blue-700 dark:text-blue-300">Run automatically</p>
+                        {/* Sparkline simulation */}
+                        <div className="mt-4 flex gap-0.5 h-1 items-end opacity-20 group-hover:opacity-40 transition-opacity">
+                            {[40, 60, 45, 70, 80, 60, 75, 50, 65, 85].map((h, i) => (
+                                <div key={i} className="flex-1 bg-blue-500 rounded-full" style={{ height: `${h}%` }}></div>
+                            ))}
                         </div>
                     </div>
-                    <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-2xl border border-green-100 dark:border-green-800 flex items-center gap-4">
-                        <div className="p-3 bg-green-100 dark:bg-green-800 rounded-xl text-green-600 dark:text-green-400">
-                            <Clock className="w-6 h-6" />
+
+                    {/* Stat Card 3: Hours Saved */}
+                    <div className="relative overflow-hidden bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-lg transition-all duration-300 group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-green-100 dark:bg-green-900/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-green-200 dark:group-hover:bg-green-900/20"></div>
+                        <div className="relative flex justify-between items-start">
+                            <div>
+                                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Hours Saved</p>
+                                <h3 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                                    ~{((usage?.automation_count || 0) * 0.25).toFixed(1)}h
+                                </h3>
+                                <div className="flex items-center gap-1 mt-2 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded-full w-fit">
+                                    <ArrowUpRight className="w-3 h-3" />
+                                    <span>Efficiency up</span>
+                                </div>
+                            </div>
+                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform duration-300">
+                                <Clock className="w-6 h-6" />
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-green-800 dark:text-green-200">Hours Saved</p>
-                            <p className="text-2xl font-bold text-gray-900 dark:text-white">~{((usage?.automation_count || 0) * 0.25).toFixed(1)}h</p>
-                            <p className="text-xs text-green-700 dark:text-green-300">Est. 15min / task</p>
+                        {/* Progress bar simulation */}
+                        <div className="mt-6 w-full bg-gray-100 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                            <div className="bg-gradient-to-r from-green-400 to-emerald-500 h-full rounded-full w-[65%]"></div>
                         </div>
                     </div>
                 </div>
@@ -496,10 +577,27 @@ export default function Dashboard() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                            {feed.length === 0 ? (
+                                            {feedLoading ? (
+                                                Array(5).fill(0).map((_, i) => (
+                                                    <tr key={i} className="animate-pulse">
+                                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div></td>
+                                                        <td className="px-6 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div></td>
+                                                        <td className="px-6 py-4"><div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full inline-block mr-2"></div><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 inline-block"></div></td>
+                                                        <td className="px-6 py-4"><div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full w-24 mb-1"></div><div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-8"></div></td>
+                                                        <td className="px-6 py-4"><div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-20"></div></td>
+                                                        <td className="px-6 py-4 text-right"><div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16 ml-auto"></div></td>
+                                                    </tr>
+                                                ))
+                                            ) : feed.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
-                                                        No recent escalations detected.
+                                                    <td colSpan="6" className="px-6 py-12 text-center">
+                                                        <div className="flex flex-col items-center justify-center text-gray-400">
+                                                            <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                                                                <Activity className="w-8 h-8 text-gray-300" />
+                                                            </div>
+                                                            <p className="text-lg font-medium text-gray-900 dark:text-gray-300">All Quiet</p>
+                                                            <p className="text-sm">No escalations detected in the last 24 hours.</p>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ) : (

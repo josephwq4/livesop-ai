@@ -117,14 +117,35 @@ export default function Onboarding() {
                                 <p className="text-gray-600 dark:text-gray-300 text-lg mb-8">
                                     LiveSOP needs to observe your public support channels to learn how your team resolves issues.
                                 </p>
-                                <button
-                                    onClick={handleSlackConnect}
-                                    disabled={loading}
-                                    className="bg-[#4A154B] hover:bg-[#3f1140] text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-transform hover:scale-105"
-                                >
-                                    {loading ? <Loader2 className="animate-spin" /> : <Slack className="w-5 h-5" />}
-                                    Connect Workspace
-                                </button>
+                                <div className="flex flex-col gap-4">
+                                    <button
+                                        onClick={handleSlackConnect}
+                                        disabled={loading}
+                                        className="bg-[#4A154B] hover:bg-[#3f1140] text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-transform hover:scale-105 shadow-lg w-full"
+                                    >
+                                        {loading ? <Loader2 className="animate-spin" /> : <Slack className="w-5 h-5" />}
+                                        Connect Workspace
+                                    </button>
+
+                                    <div className="relative flex py-2 items-center">
+                                        <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+                                        <span className="flex-shrink-0 mx-4 text-gray-400 text-sm">Or for trial</span>
+                                        <div className="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm("Load sample data for demo?")) {
+                                                localStorage.setItem('demo_mode', 'true');
+                                                navigate('/dashboard');
+                                            }
+                                        }}
+                                        className="bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 px-8 py-3 rounded-xl font-semibold hover:border-blue-500 hover:text-blue-500 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Zap className="w-4 h-4" />
+                                        Launch Demo Sandbox
+                                    </button>
+                                </div>
                             </div>
                         )}
 

@@ -25,42 +25,50 @@ export default function TrustPanel({ escalation, onClose, onAction, autoPilot })
                 ref={panelRef}
                 className="relative w-full max-w-md bg-white dark:bg-gray-900 h-full shadow-2xl overflow-y-auto border-l border-gray-200 dark:border-gray-700 animate-slide-in-right flex flex-col"
             >
-                {/* Header */}
-                <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start bg-gray-50/50 dark:bg-gray-800/50">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${escalation.confidence > 0.8
-                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                                }`}>
-                                {escalation.confidence > 0.8 ? 'High Confidence' : 'Review Needed'}
-                            </span>
-                            <span className="text-xs text-gray-500">{new Date(escalation.time).toLocaleString()}</span>
-                        </div>
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
-                            Escalation Detected
-                        </h2>
-                    </div>
+                {/* Header - Premium Design */}
+                <div className="relative p-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 pb-8">
                     <button
                         onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     >
                         <X className="w-5 h-5" />
                     </button>
+
+                    <div className="flex flex-col gap-1 mb-6">
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                            AI Confidence Score
+                        </span>
+                        <div className="flex items-baseline gap-3">
+                            <h1 className={`text-5xl font-black tracking-tight ${escalation.confidence > 0.8
+                                    ? 'text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-600'
+                                    : 'text-amber-500'
+                                }`}>
+                                {Math.round(escalation.confidence * 100)}%
+                            </h1>
+                            <div className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide border ${escalation.confidence > 0.8
+                                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'
+                                    : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
+                                }`}>
+                                {escalation.confidence > 0.8 ? 'High Certainty' : 'Review Needed'}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Reasoning Box */}
+                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
+                        <div className="flex items-center gap-2 mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            <Shield className="w-3 h-3" />
+                            AI Reasoning
+                        </div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
+                            {escalation.rationale}
+                        </p>
+                    </div>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 p-6 space-y-8">
-
-                    {/* Why this matched */}
-                    <div>
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <Shield className="w-4 h-4" /> Why it matched
-                        </h3>
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800 text-sm text-blue-900 dark:text-blue-100 leading-relaxed">
-                            {escalation.rationale || "The content matched the configured intent patterns for 'High Priority Bug' and was posted in a tracked support channel."}
-                        </div>
-                    </div>
+                <div className="flex-1 p-6 space-y-8 overflow-y-auto">
+                    {/* Source Context */}
 
                     {/* Source Context */}
                     <div>

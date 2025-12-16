@@ -15,7 +15,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.routes import integrations, workflows, automations, webhooks, usage, settings, health, knowledge
+# from app.routes import integrations, workflows, automations, webhooks, usage, settings, health, knowledge
+# Temporarily minimal imports for debugging
+from app.routes import health
 from app.dependencies.auth import get_current_user
 
 from app.middleware.logging import AuditLoggingMiddleware
@@ -53,45 +55,45 @@ app.add_middleware(
 
 # Include routers with Authentication Lock
 print("[INFO] Loading routers with Auth Enabled")
-app.include_router(
-    integrations.router, 
-    prefix="/integrations", 
-    dependencies=[Depends(get_current_user)]
-)
+# app.include_router(
+#     integrations.router, 
+#     prefix="/integrations", 
+#     dependencies=[Depends(get_current_user)]
+# )
 
-app.include_router(
-    workflows.router, 
-    prefix="/workflows", 
-    dependencies=[Depends(get_current_user)]
-)
-app.include_router(
-    automations.router, 
-    prefix="/automations", 
-    dependencies=[Depends(get_current_user)]
-)
+# app.include_router(
+#     workflows.router, 
+#     prefix="/workflows", 
+#     dependencies=[Depends(get_current_user)]
+# )
+# app.include_router(
+#     automations.router, 
+#     prefix="/automations", 
+#     dependencies=[Depends(get_current_user)]
+# )
 
-app.include_router(
-    usage.router, 
-    prefix="/usage", 
-    dependencies=[Depends(get_current_user)]
-)
+# app.include_router(
+#     usage.router, 
+#     prefix="/usage", 
+#     dependencies=[Depends(get_current_user)]
+# )
 
-app.include_router(
-    settings.router, 
-    dependencies=[Depends(get_current_user)]
-)
+# app.include_router(
+#     settings.router, 
+#     dependencies=[Depends(get_current_user)]
+# )
 
-app.include_router(
-    knowledge.router,
-    prefix="/knowledge", 
-    dependencies=[Depends(get_current_user)]
-)
+# app.include_router(
+#     knowledge.router,
+#     prefix="/knowledge", 
+#     dependencies=[Depends(get_current_user)]
+# )
 
 # Webhooks (Public endpoint with Internal Signature Verification)
-app.include_router(
-    webhooks.router,
-    prefix="/webhooks"
-)
+# app.include_router(
+#     webhooks.router,
+#     prefix="/webhooks"
+# )
 
 # Health checks (Public endpoint for monitoring)
 app.include_router(
@@ -105,7 +107,7 @@ app.include_router(
 def root(request: Request):
     """Root endpoint (Public)"""
     return {
-        "message": "Welcome to LiveSOP AI",
+        "message": "LiveSOP AI (Maintenance Mode)",
         "version": "1.0.0",
         "status": "running",
         "auth": "enabled"

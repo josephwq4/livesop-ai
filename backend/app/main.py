@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -13,9 +13,12 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# 2. Imports (Dependencies)
+# 2. Dependencies
 from app.dependencies.auth import get_current_user
 from app.middleware.logging import AuditLoggingMiddleware
+
+# 3. Routers (Phase 36: Usage + Settings)
+from app.routes import health, usage, settings
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -39,9 +42,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/health")
-def health_check(request: Request):
-    return {"status": "healthy", "mode": "middleware_active"}
+# Active Routers
+app.include_router(usage.router, prefix="/usage", dependencies=[Depends(get_current_user)])
+app.include_router(settings.router, dependencies=[Depends(get_current_user)])
+app.include_router(health.router, prefix="")
+
+@app.get("/")
+@limiter.limit("50/minute")
+def root(request: Request):
+    return {"message": "LiveSOP AI (Stable Base Active)", "status": "running"}
 
 if __name__ == "__main__":
     import uvicorn

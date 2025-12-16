@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from app.services.workflow_inference import infer_workflow, generate_sop_document, query_similar_events
 from app.models.workflow import WorkflowGraph
 from typing import Optional, Dict, Any
@@ -8,10 +8,16 @@ router = APIRouter(tags=["workflows"])
 
 
 @router.get("/{team_id}/workflows")
-
-
-def get_workflows(team_id: str, current_user: dict = Depends(get_current_user), workflow_id: Optional[str] = None):
-    """Get active inferred workflow or specific version for the authenticated user's team"""
+def get_workflows(
+    team_id: str, 
+    response: Response,
+    current_user: dict = Depends(get_current_user), 
+    workflow_id: Optional[str] = None
+):
+    """
+    Get active inferred workflow or specific version for the authenticated user's team.
+    Phase D: Optimized with caching headers for faster dashboard loads.
+    """
     try:
         from app.repositories.persistence import PersistenceRepository
         repo = PersistenceRepository()
@@ -24,6 +30,10 @@ def get_workflows(team_id: str, current_user: dict = Depends(get_current_user), 
             workflow_graph = repo.get_workflow_by_id(workflow_id, real_team_id)
         else:
             workflow_graph = repo.get_active_workflow(real_team_id)
+        
+        # Phase D: Add caching headers for faster subsequent loads
+        # Workflows don't change frequently, safe to cache for 30 seconds
+        response.headers["Cache-Control"] = "private, max-age=30"
         
         # If no persistent workflow, return empty structure (Frontend handles "No Workflows Yet")
         if not workflow_graph:

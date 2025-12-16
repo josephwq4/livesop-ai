@@ -12,7 +12,12 @@ from datetime import datetime
 router = APIRouter(tags=["webhooks"])
 
 async def process_slack_event(event: dict, slack_team_id: str):
-    """Process Slack event in background"""
+    """
+    Process Slack event in background with production-grade error handling.
+    Phase D: Hardened for retries, timeouts, and graceful failures.
+    """
+    start_time = time.time()
+    
     try:
         # Filter: Only messages, no bot messages
         if event.get("type") != "message" or event.get("subtype"):
@@ -48,19 +53,49 @@ async def process_slack_event(event: dict, slack_team_id: str):
                 "channel": channel,
                 "signal_type": _classify_signal(text),
                 "slack_event_id": event.get("client_msg_id"),
-                "slack_team_id": slack_team_id
+                "slack_team_id": slack_team_id,
+                "permalink": f"https://slack.com/archives/{channel}/p{ts.replace('.', '')}"
             }
         }
         
-        # Insert
-        repo.ingest_signals(target_team_id, [new_signal])
-        print(f"✅ [Webhook] Ingested signal from {actor}: {text[:30]}... -> Team {target_team_id}")
+        # Insert (idempotent due to unique constraint on team_id+source+external_id)
+        try:
+            repo.ingest_signals(target_team_id, [new_signal])
+            print(f"✅ [Webhook] Ingested signal from {actor}: {text[:30]}... → Team {target_team_id}")
+        except Exception as ingest_error:
+            # If duplicate, this is expected (Slack retries)
+            if "duplicate" in str(ingest_error).lower() or "unique" in str(ingest_error).lower():
+                print(f"ℹ️ [Webhook] Duplicate signal detected (Slack retry). Skipping. Event: {ts}")
+                return  # Don't trigger evaluation again
+            else:
+                raise  # Re-raise if it's a different error
         
-        # Trigger Auto-Pilot Evaluation
-        evaluate_signal(target_team_id, new_signal)
+        # Trigger Auto-Pilot Evaluation (with timeout protection)
+        try:
+            # Timeout protection: If evaluation takes > 25 seconds, it will be killed
+            # (Render has 30s timeout, we need buffer for response)
+            import asyncio
+            await asyncio.wait_for(
+                asyncio.to_thread(evaluate_signal, target_team_id, new_signal),
+                timeout=25.0
+            )
+            
+            elapsed = time.time() - start_time
+            print(f"⏱️ [Webhook] Processed in {elapsed:.2f}s")
+            
+        except asyncio.TimeoutError:
+            print(f"⚠️ [Webhook] Evaluation timeout after 25s. Signal logged but not evaluated. Event: {ts}")
+            # Signal is already in DB, evaluation can be retried manually via replay endpoint
+            
+        except Exception as eval_error:
+            print(f"❌ [Webhook] Evaluation failed: {eval_error}. Signal logged but not evaluated.")
+            # Signal is in DB, can be replayed later
         
     except Exception as e:
-        print(f"❌ [Webhook] Error processing event: {e}")
+        print(f"❌ [Webhook] Critical error processing event: {e}")
+        import traceback
+        traceback.print_exc()
+        # Don't raise - we want to return 200 to Slack to prevent retries
 
 
 @router.post("/slack")

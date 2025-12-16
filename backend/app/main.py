@@ -15,9 +15,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# from app.routes import integrations, workflows, automations, webhooks, usage, settings, health, knowledge
-# Temporarily minimal imports for debugging
-from app.routes import health
+from app.routes import health, workflows, usage, settings, knowledge
+# from app.routes import integrations, automations, webhooks
 from app.dependencies.auth import get_current_user
 
 from app.middleware.logging import AuditLoggingMiddleware
@@ -61,33 +60,33 @@ print("[INFO] Loading routers with Auth Enabled")
 #     dependencies=[Depends(get_current_user)]
 # )
 
-# app.include_router(
-#     workflows.router, 
-#     prefix="/workflows", 
-#     dependencies=[Depends(get_current_user)]
-# )
+app.include_router(
+    workflows.router, 
+    prefix="/workflows", 
+    dependencies=[Depends(get_current_user)]
+)
 # app.include_router(
 #     automations.router, 
 #     prefix="/automations", 
 #     dependencies=[Depends(get_current_user)]
 # )
 
-# app.include_router(
-#     usage.router, 
-#     prefix="/usage", 
-#     dependencies=[Depends(get_current_user)]
-# )
+app.include_router(
+    usage.router, 
+    prefix="/usage", 
+    dependencies=[Depends(get_current_user)]
+)
 
-# app.include_router(
-#     settings.router, 
-#     dependencies=[Depends(get_current_user)]
-# )
+app.include_router(
+    settings.router, 
+    dependencies=[Depends(get_current_user)]
+)
 
-# app.include_router(
-#     knowledge.router,
-#     prefix="/knowledge", 
-#     dependencies=[Depends(get_current_user)]
-# )
+app.include_router(
+    knowledge.router,
+    prefix="/knowledge", 
+    dependencies=[Depends(get_current_user)]
+)
 
 # Webhooks (Public endpoint with Internal Signature Verification)
 # app.include_router(

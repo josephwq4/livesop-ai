@@ -65,6 +65,16 @@ class PersistenceRepository:
             print(f"[DB Error] Set Node Auto-Run: {e}")
             return False
 
+    # --- INTEGRATIONS ---
+    def get_team_integrations(self, team_id: str) -> List[Dict]:
+        """Fetch all configured integrations (Slack channels, Jira projects) for a team"""
+        try:
+            res = self.db.table("channel_configs").select("*").eq("team_id", team_id).execute()
+            return res.data
+        except Exception as e:
+            print(f"[DB Error] Get Integrations: {e}")
+            return []
+
     # --- RAW SIGNALS ---
     def ingest_signals(self, team_id: str, signals: List[Dict[str, Any]]) -> List[str]:
         """

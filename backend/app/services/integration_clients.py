@@ -2,6 +2,7 @@ import os
 import requests
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+from app.repositories.persistence import PersistenceRepository
 
 # LAZY LOADING PATTERN:
 # All heavy external libraries (slack_sdk, jira, google) must be imported INSIDE the function.
@@ -74,11 +75,34 @@ def send_slack_message(token: str, channel_id: str, text: str):
 
 def fetch_all_events(team_id: str) -> List[Dict]:
     """
-    Aggregator function used by Workflow Inference.
-    Currently stubbed to return empty list or use basic Env Vars if available.
+    Aggregates events from all configured integrations for a team.
     """
-    # For MVP, we can check basic env vars or just return empty
-    # Logic: We can't fetch real events because we don't have the token passed in here.
-    # In Phase 2, this function should query 'channel_configs' table to get tokens.
-    # For Checkpoint Alpha+, return empty to be safe.
-    return []
+    events = []
+    try:
+        repo = PersistenceRepository()
+        configs = repo.get_team_integrations(team_id)
+        
+        print(f"[Integrations] Found {len(configs)} configs for team {team_id}")
+        
+        for config in configs:
+            # Determine provider from config JSON or fallback defaults
+            # Schema: channel_id, channel_name, config (jsonb)
+            conf_data = config.get("config") or {}
+            
+            # 1. Slack
+            # We assume channel_configs are primarily Slack channels for now
+            # Only fetch if we have a token (either in DB or Env)
+            slack_token = conf_data.get("token") or os.getenv("SLACK_TOKEN")
+            slack_channel = config.get("channel_id")
+            
+            if slack_token and slack_channel and slack_channel.startswith("C"):
+                print(f"Polling Slack Channel: {slack_channel}")
+                events.extend(fetch_slack_events(slack_token, slack_channel))
+                
+            # 2. Jira (Future: Store jira config in table too)
+            # if conf_data.get("provider") == 'jira': ...
+                
+    except Exception as e:
+        print(f"Aggregation Error: {e}")
+        
+    return events

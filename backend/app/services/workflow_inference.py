@@ -125,43 +125,48 @@ Return JSON strictly."""
 
 
 def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:
-    """Main inference logic with UUID validation"""
+    """Main inference logic with UUID validation and Trace Logging"""
     try:
-        # 1. Initialize Repo
+        print(f"[TRACE] Starting Inference for Team: {team_id}", flush=True)
         repo = PersistenceRepository()
         
-        # 2. Resolve Real DB UUID from User
-        # This prevents "invalid input syntax for type uuid" errors if team_id is 'team123'
         real_team_id = team_id
         if user_id:
+            print(f"[TRACE] Resolving real team id for user: {user_id}", flush=True)
             real_team_id = repo.get_or_create_team(f"Team {user_id[:4]}", user_id)
         
-        print(f"[Inference] Processing for team: {real_team_id}")
-            
-        # 3. Fetch Events (Using REAL UUID)
+        print(f"[TRACE] Resolved UUID: {real_team_id}. Fetching Events...", flush=True)
         events = fetch_all_events(real_team_id)
         if not events:
+            print("[TRACE] No events found. Logic stopping.", flush=True)
             return {"message": "No events found", "workflow": None}
             
-        # 4. Ingest Signals (Using REAL UUID)
+        print(f"[TRACE] Events fetched: {len(events)}. Ingesting Signals...", flush=True)
         signal_ids = repo.ingest_signals(real_team_id, events)
         
-        # 5. Create Run
+        print(f"[TRACE] Signals ingested. Creating Inference Run record...", flush=True)
         run_id = repo.create_inference_run(real_team_id, "manual_dashboard", {"model": "gpt-4"})
+        
+        print(f"[TRACE] Linking run {run_id} to signals...", flush=True)
         repo.link_signals_to_run(run_id, signal_ids)
         
-        # 6. LLM Generation
+        print(f"[TRACE] Calling LLM Generation...", flush=True)
         workflow_graph = generate_workflow_graph_with_llm(events)
         
-        # 7. Save Workflow (Commit Artifact)
+        print(f"[TRACE] LLM Success. Persisting Workflow to DB...", flush=True)
         persisted_wf_id = repo.save_workflow(real_team_id, run_id, workflow_graph)
         
-        # 8. Complete Run
+        print(f"[TRACE] Completion. Finalizing Run...", flush=True)
         repo.complete_inference_run(run_id, "success")
         
         workflow_graph["workflow_id"] = persisted_wf_id
         workflow_graph["team_id"] = real_team_id
         return workflow_graph
+        
+    except Exception as e:
+        print(f"CRITICAL INFERENCE ERROR: {e}", flush=True)
+        # Capture and expose the specific error to help debug
+        return {"error": str(e), "traceback": "Check Render Logs"}
         
     except Exception as e:
         print(f"[Inference Error]: {e}")

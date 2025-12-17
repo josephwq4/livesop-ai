@@ -108,7 +108,20 @@ Return JSON strictly."""
         return json.loads(workflow_text)
     except Exception as e:
         print(f"GPT-4 Error: {e}")
-        return {"nodes": [], "edges": []}
+        # Return visible error node so user knows why graph is empty
+        return {
+            "nodes": [
+                {
+                    "id": "error_node", 
+                    "step": "Generation Failed",
+                    "owner": "System",
+                    "description": f"Error: {str(e)}",
+                    "type": "process",
+                    "data": {"label": "Generation Failed", "description": str(e)}
+                }
+            ], 
+            "edges": []
+        }
 
 
 def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:

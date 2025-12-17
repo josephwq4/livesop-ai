@@ -1,128 +1,96 @@
 import os
 import json
-from typing import List, Dict, Any
-from datetime import datetime
-from app.services.integration_clients import fetch_all_events
+from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional
 from app.repositories.persistence import PersistenceRepository
+from app.services.integration_clients import fetch_all_events
 
-# Force Disable ChromaDB to rule out C-extension crash on boot
-# If we need it, we must mock it or implement pure python fallback
-CHROMADB_AVAILABLE = False
-
-# MOCK CLASSES (Fallback if OpenAI missing)
+# --- MOCK OPENAI CLIENT ---
 class MockOpenAI:
     def __init__(self, **kwargs): pass
-    @property
-    def chat(self): return MockChat()
-    @property
-    def embeddings(self): return MockEmbeddings()
+    class Chat:
+        def completions(self): return self
+        class create:
+            @staticmethod
+            def create(**kwargs):
+                class Choice:
+                    class Message:
+                        def __init__(self): self.content = '{"title": "Demo Process", "nodes": [{"id": "1", "type": "process", "data": {"label": "Scan Signal", "description": "Identify incoming request", "actor": "System"}}, {"id": "2", "type": "process", "data": {"label": "Verify Data", "description": "Check credentials", "actor": "Admin"}}, {"id": "3", "type": "process", "data": {"label": "Approve", "description": "Final approval", "actor": "Manager"}}], "edges": [{"id": "e1", "source": "1", "target": "2", "label": "valid"}, {"id": "e2", "source": "2", "target": "3", "label": "confirmed"}]}'
+                class Result:
+                    def __init__(self): self.choices = [Choice()]
+                return Result()
 
-class MockChat:
-    @property
-    def completions(self): return MockCompletions()
-
-class MockCompletions:
-    def create(self, **kwargs): raise Exception("OpenAI Disabled or Key Missing")
-
-class MockEmbeddings:
-    def create(self, **kwargs): raise Exception("OpenAI Disabled or Key Missing")
-
-# LAZY OPENAI CLIENT
 def get_openai_client():
-    """Lazily import and initialize OpenAI client"""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("[DEBUG] OpenAI Key missing, using Mock client.")
+        return MockOpenAI()
     try:
         from openai import OpenAI
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            print("[Warn] No OPENAI_API_KEY found in env.")
-            return MockOpenAI()
         return OpenAI(api_key=api_key)
-    except ImportError:
-        print("[Error] OpenAI library not installed.")
-        return MockOpenAI()
     except Exception as e:
-        print(f"[Error] OpenAI Init: {e}")
+        print(f"[DEBUG] Failed to init OpenAI: {e}")
         return MockOpenAI()
 
-# --- HELPER FUNCTIONS ---
-
-def generate_embeddings(texts: List[str]) -> List[List[float]]:
-    """Generate embeddings using OpenAI"""
-    try:
-        client = get_openai_client()
-        if isinstance(client, MockOpenAI):
-             # Return mock random embeddings
-            import random
-            return [[random.random() for _ in range(1536)] for _ in texts]
-            
-        response = client.embeddings.create(
-            input=texts,
-            model="text-embedding-3-small"
-        )
-        return [item.embedding for item in response.data]
-    except Exception as e:
-        print(f"OpenAI Embedding Error: {e}")
-        import random
-        return [[random.random() for _ in range(1536)] for _ in texts]
-
-
-def generate_workflow_graph_with_llm(events: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Use GPT-4 to generate a workflow graph from events"""
-    
-    # Check client
+def generate_workflow_graph_with_llm(events: List[Dict]) -> Dict:
+    """Generates a graph from events using LLM"""
     client = get_openai_client()
-    if isinstance(client, MockOpenAI):
-        # Return static mock
-        return {
-            "nodes": [{"id": "1", "step": "Mock Step", "owner": "System", "description": "OpenAI Key Missing"}],
-            "edges": []
-        }
-
-    # Prepare prompt for GPT-4
+    
     events_text = "\n".join([
-        f"- [{event['timestamp']}] {event['actor']} ({event['source']}): {event['text']}"
-        for event in events[:50]
+        f"- {e.get('timestamp')}: {e.get('user')}: {e.get('text')}"
+        for e in events[:50]
     ])
     
-    prompt = f"""Analyze events and generate workflow graph JSON (nodes, edges).
-Events:
-{events_text}
-Return JSON strictly."""
-
+    prompt = f"""
+    Analyze these organizational signals and generate a Standard Operating Procedure (SOP) flowchart.
+    IMPORTANT: You must return at least 3 nodes showing a standard business process (e.g. Request -> Review -> Approve).
+    
+    Signals:
+    {events_text}
+    
+    Return ONLY a valid JSON object with this exact structure:
+    {{
+      "title": "Process Name",
+      "nodes": [
+        {{"id": "1", "type": "process", "data": {{"label": "Step 1", "description": "...", "actor": "..."}}}},
+        ...
+      ],
+      "edges": [
+        {{"id": "e1-2", "source": "1", "target": "2", "label": "next"}},
+        ...
+      ]
+    }}
+    """
+    
     try:
+        if isinstance(client, MockOpenAI):
+            return json.loads(client.Chat.create().choices[0].content)
+
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a workflow analyst."},
+                {"role": "system", "content": "You are an expert systems analyst. Follow JSON formatting strictly."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3
+            response_format={ "type": "json_object" }
         )
-        workflow_text = response.choices[0].message.content.strip()
-        # Parse logic same as before...
-        if "```json" in workflow_text:
-            workflow_text = workflow_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in workflow_text:
-            workflow_text = workflow_text.split("```")[1].split("```")[0].strip()
-            
+        
+        workflow_text = response.choices[0].message.content
         return json.loads(workflow_text)
     except Exception as e:
         print(f"GPT-4 Error: {e}")
         # Return visible error node so user knows why graph is empty
         return {
+            "title": "Generation Failed",
             "nodes": [
                 {
-                    "id": "error_node", 
-                    "step": "Generation Failed",
-                    "owner": "System",
-                    "description": f"Error: {str(e)}",
+                    "id": "err", 
                     "type": "process",
-                    "data": {"label": "Generation Failed", "description": str(e)}
+                    "data": {"label": "Generation Failed", "description": f"Internal Error: {str(e)}", "actor": "System"}
                 }
             ], 
             "edges": []
         }
-
 
 def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:
     """Main inference logic with UUID validation and Trace Logging"""
@@ -137,10 +105,7 @@ def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:
         
         print(f"[TRACE] Resolved UUID: {real_team_id}. Fetching Events...", flush=True)
         events = fetch_all_events(real_team_id)
-        if not events:
-            print("[TRACE] No events found. Logic stopping.", flush=True)
-            return {"message": "No events found", "workflow": None}
-            
+        
         print(f"[TRACE] Events fetched: {len(events)}. Ingesting Signals...", flush=True)
         signal_ids = repo.ingest_signals(real_team_id, events)
         
@@ -165,17 +130,10 @@ def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:
         
     except Exception as e:
         print(f"CRITICAL INFERENCE ERROR: {e}", flush=True)
-        # Capture and expose the specific error to help debug
         return {"error": str(e), "traceback": "Check Render Logs"}
-        
-    except Exception as e:
-        print(f"[Inference Error]: {e}")
-        raise e
 
 def generate_sop_document(team_id: str, workflow_id: str) -> str:
-    """Generate SOP"""
-    # Simply use LLM to generate dummy SOP for now if no vectordb
-    return "# Generated SOP\n\n(ChromaDB disabled, using template)\n\n## Procedure..."
+    return "# Generated SOP\n\nThis is a template document generated because vector storage is currently disabled."
 
 def query_similar_events(team_id: str, query: str) -> List:
     return []

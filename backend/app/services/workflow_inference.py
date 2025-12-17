@@ -125,35 +125,42 @@ Return JSON strictly."""
 
 
 def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:
-    """Main inference logic"""
+    """Main inference logic with UUID validation"""
     try:
-        # 1. Repo
+        # 1. Initialize Repo
         repo = PersistenceRepository()
+        
+        # 2. Resolve Real DB UUID from User
+        # This prevents "invalid input syntax for type uuid" errors if team_id is 'team123'
         real_team_id = team_id
         if user_id:
             real_team_id = repo.get_or_create_team(f"Team {user_id[:4]}", user_id)
+        
+        print(f"[Inference] Processing for team: {real_team_id}")
             
-        # 2. Fetch Events
-        events = fetch_all_events(team_id)
+        # 3. Fetch Events (Using REAL UUID)
+        events = fetch_all_events(real_team_id)
         if not events:
             return {"message": "No events found", "workflow": None}
             
-        # 3. Embeddings (Optional)
-        # 4. Ingest Signals
+        # 4. Ingest Signals (Using REAL UUID)
         signal_ids = repo.ingest_signals(real_team_id, events)
         
         # 5. Create Run
         run_id = repo.create_inference_run(real_team_id, "manual_dashboard", {"model": "gpt-4"})
         repo.link_signals_to_run(run_id, signal_ids)
         
-        # 6. LLM
+        # 6. LLM Generation
         workflow_graph = generate_workflow_graph_with_llm(events)
         
-        # 7. Save
+        # 7. Save Workflow (Commit Artifact)
         persisted_wf_id = repo.save_workflow(real_team_id, run_id, workflow_graph)
+        
+        # 8. Complete Run
         repo.complete_inference_run(run_id, "success")
         
         workflow_graph["workflow_id"] = persisted_wf_id
+        workflow_graph["team_id"] = real_team_id
         return workflow_graph
         
     except Exception as e:

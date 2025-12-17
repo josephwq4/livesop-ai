@@ -3,11 +3,11 @@ from app.models.workflow import WorkflowGraph
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from app.dependencies.auth import get_current_user
+from app.repositories.persistence import PersistenceRepository
+from app.services.workflow_inference import infer_workflow, generate_sop_document, query_similar_events
 
-# Stub logic to identify import crash
-def infer_workflow(*args, **kwargs): return {}
-def generate_sop_document(*args, **kwargs): return "SOP stub"
-def query_similar_events(*args, **kwargs): return []
+# BOOT TRACE
+print("[BOOT] Loading Workflows Router...", flush=True)
 
 router = APIRouter(tags=["workflows"])
 
@@ -29,7 +29,6 @@ def get_workflows(
     Get active inferred workflow or specific version for the authenticated user's team.
     """
     try:
-        from app.repositories.persistence import PersistenceRepository
         repo = PersistenceRepository()
         
         # Resolve Team from User (Single Tenant MVP)
@@ -57,29 +56,44 @@ def get_workflows(
             "workflow": workflow_graph
         }
     except Exception as e:
+        print(f"Workflow Fetch Error: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching workflows: {str(e)}")
 
-@router.get("/test_models")
-def test_models():
-    # Instantiate to test runtime
-    node = WorkflowNodeBatchUpdate(id="1")
-    return {"status": "ok", "node": node.dict()}
+@router.post("/{team_id}/infer")
+def run_inference(team_id: str, current_user: dict = Depends(get_current_user)):
+    """Trigger AI inference to generate workflow from events"""
+    try:
+        user_id = current_user.get("sub")
+        workflow = infer_workflow(team_id, user_id)
+        return {"success": True, "workflow": workflow}
+    except Exception as e:
+        print(f"Inference Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-# PHASE 24 RESTRICTION: Comment out all other endpoints to isolate toxicity
-# @router.get("/{team_id}/history")
-# def get_history...
+@router.get("/{team_id}/history")
+def get_history(team_id: str, limit: int = 10, current_user: dict = Depends(get_current_user)):
+    try:
+        repo = PersistenceRepository()
+        user_id = current_user.get("sub")
+        real_team_id = repo.get_or_create_team(f"Team {user_id[:4]}", user_id)
+        
+        history = repo.get_workflow_history(real_team_id, limit)
+        return {"history": history}
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
 
-# @router.get("/{team_id}/search")
-# def search_knowledge...
+@router.get("/{team_id}/sop")
+def get_sop(team_id: str, workflow_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    try:
+        sop_content = generate_sop_document(team_id, workflow_id)
+        return {"sop": sop_content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-# @router.post("/{team_id}/infer")
-# def run_inference...
-
-# @router.get("/{team_id}/sop")
-# def get_sop...
-
-# @router.put("/{team_id}/{workflow_id}/nodes")
-# def update_workflow_nodes...
-
-# @router.patch("/{team_id}/nodes/{node_id}")
-# def update_node...
+@router.get("/{team_id}/search")
+def search_knowledge(team_id: str, q: str, current_user: dict = Depends(get_current_user)):
+    try:
+        results = query_similar_events(team_id, q)
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

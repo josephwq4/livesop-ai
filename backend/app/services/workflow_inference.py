@@ -92,6 +92,23 @@ def generate_workflow_graph_with_llm(events: List[Dict]) -> Dict:
             "edges": []
         }
 
+def generate_embeddings(texts: List[str]) -> List[List[float]]:
+    """Generates vector embeddings for a list of strings"""
+    client = get_openai_client()
+    try:
+        if isinstance(client, MockOpenAI):
+            # Return dummy 1536-dim vectors
+            return [[0.0] * 1536 for _ in texts]
+
+        response = client.embeddings.create(
+            input=texts,
+            model="text-embedding-3-small"
+        )
+        return [data.embedding for data in response.data]
+    except Exception as e:
+        print(f"Embedding Error: {e}")
+        return [[0.0] * 1536 for _ in texts]
+
 def infer_workflow(team_id: str, user_id: str = None) -> Dict[str, Any]:
     """Main inference logic with UUID validation and Trace Logging"""
     try:

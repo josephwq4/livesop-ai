@@ -46,10 +46,10 @@ from app.routes import automations
 # Disabled Routers - Commented out to prevent load
 boot_log("-> Importing Workflows Router")
 from app.routes import workflows
-# boot_log("-> Importing Knowledge Router")
-# from app.routes import knowledge
-# boot_log("-> Importing Webhooks Router")
-# from app.routes import webhooks
+boot_log("-> Importing Knowledge Router")
+from app.routes import knowledge
+boot_log("-> Importing Webhooks Router")
+from app.routes import webhooks
 
 boot_log("Initializing FastAPI App...")
 limiter = Limiter(key_func=get_remote_address)
@@ -81,6 +81,8 @@ app.include_router(settings.router, dependencies=[Depends(get_current_user)])
 app.include_router(integrations.router, prefix="/integrations", dependencies=[Depends(get_current_user)])
 app.include_router(automations.router, prefix="/automations", dependencies=[Depends(get_current_user)])
 app.include_router(workflows.router, prefix="/workflows", dependencies=[Depends(get_current_user)])
+app.include_router(knowledge.router, prefix="/knowledge", dependencies=[Depends(get_current_user)])
+app.include_router(webhooks.router, prefix="/webhooks")
 app.include_router(health.router, prefix="")
 
 @app.get("/")
